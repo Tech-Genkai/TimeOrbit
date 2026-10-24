@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import createGlobe from 'cobe';
+import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import * as THREE from 'three';
 import { CITIES } from '@/lib/cities';
+import { getSubsolarPoint, getSublunarPoint } from '@/lib/timeEngine';
 
-interface Marker {
-  location: [number, number]; // [lat, lng]
-  size: number;
-  color?: [number, number, number];
+export interface GlobeCanvasHandle {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
 }
 
 interface GlobeLocation {
@@ -20,234 +21,749 @@ interface GlobeCanvasProps {
   primaryLocation?: GlobeLocation;
   secondaryLocation?: GlobeLocation;
   autoRotate?: boolean;
+  focusedTarget?: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth';
+  onFocusChange?: (target: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth') => void;
+  className?: string;
 }
 
-function buildGlobeMarkers(
-  primary: GlobeLocation,
-  secondary: GlobeLocation
-): Marker[] {
-  const isClose = (lat1: number, lng1: number, lat2: number, lng2: number) =>
-    Math.hypot(lat1 - lat2, lng1 - lng2) < 0.6;
+// Convert geographic coordinates (lat, lng) to 3D Cartesian vector
+function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
+  const x = -(radius * Math.sin(phi) * Math.cos(theta));
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+  const y = radius * Math.cos(phi);
+  return new THREE.Vector3(x, y, z);
+}
 
-  const markers: Marker[] = [
-    // Primary Location Pin: Radiant Neon Cyan
-    {
-      location: [primary.lat, primary.lng],
-      size: 0.1,
-      color: [0, 0.95, 1],
-    },
-    // Secondary Location Pin: Radiant Neon Purple
-    {
-      location: [secondary.lat, secondary.lng],
-      size: 0.085,
-      color: [0.85, 0.25, 1],
-    },
-  ];
+// Creates a geodesic arc geometry connecting two geographic coordinates
+function createGreatCircleArc(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+  radius: number
+): THREE.BufferGeometry {
+  const v1 = latLngToVector3(lat1, lng1, radius);
+  const v2 = latLngToVector3(lat2, lng2, radius);
+  const points: THREE.Vector3[] = [];
+  const segments = 48;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const p = new THREE.Vector3().lerpVectors(v1, v2, t);
+    const altitude = 1 + Math.sin(t * Math.PI) * 0.14;
+    p.normalize().multiplyScalar(radius * altitude);
+    points.push(p);
+  }
+  return new THREE.BufferGeometry().setFromPoints(points);
+}
 
-  // Constellation micro-markers for all other cities in CITIES
-  for (const city of CITIES) {
-    if (
-      isClose(city.lat, city.lng, primary.lat, primary.lng) ||
-      isClose(city.lat, city.lng, secondary.lat, secondary.lng)
-    ) {
-      continue;
-    }
-    markers.push({
-      location: [city.lat, city.lng],
-      size: 0.028,
-      color: [0.3, 0.5, 0.8],
-    });
+// Creates an elegant celestial sprite label
+function createMarkerSprite(text: string, color = '#ffffff', bgColor = 'rgba(0, 0, 0, 0.75)'): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    ctx.roundRect(8, 8, 240, 48, 24);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.font = '300 20px Montserrat, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
   }
 
-  return markers;
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(0.65, 0.17, 1);
+  return sprite;
 }
 
-export default function GlobeCanvas({
-  primaryLocation = { lat: 35.6762, lng: 139.6503, label: 'Tokyo' },
-  secondaryLocation = { lat: 40.7128, lng: -74.006, label: 'New York' },
-  autoRotate = true,
-}: GlobeCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+// Generates an equirectangular Earth texture with clear oceans, landmasses, night city lights, and coordinate grid
+function createProceduralEarthTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
 
-  // Focus & rotation angles
-  const initialPhi = (-primaryLocation.lng * Math.PI) / 180 - Math.PI / 2;
-  const initialTheta = Math.max(-0.4, Math.min(0.6, (primaryLocation.lat * Math.PI) / 180 * 0.7));
+  const w = canvas.width;
+  const h = canvas.height;
 
-  const phiRef = useRef<number>(initialPhi);
-  const thetaRef = useRef<number>(initialTheta);
-  const targetPhiRef = useRef<number>(initialPhi);
-  const targetThetaRef = useRef<number>(initialTheta);
+  // 1. Deep Blue Ocean Base with subtle depth gradient
+  const oceanGrad = ctx.createLinearGradient(0, 0, 0, h);
+  oceanGrad.addColorStop(0, '#0284c7');
+  oceanGrad.addColorStop(0.2, '#0369a1');
+  oceanGrad.addColorStop(0.5, '#072b4f');
+  oceanGrad.addColorStop(0.8, '#0369a1');
+  oceanGrad.addColorStop(1, '#0284c7');
+  ctx.fillStyle = oceanGrad;
+  ctx.fillRect(0, 0, w, h);
 
-  // Markers ref for dynamic uniforms
-  const markersRef = useRef<Marker[]>(buildGlobeMarkers(primaryLocation, secondaryLocation));
-  const markersNeedUpdateRef = useRef<boolean>(false);
+  const toX = (lng: number) => ((lng + 180) / 360) * w;
+  const toY = (lat: number) => ((90 - lat) / 180) * h;
 
-  // Pointer drag interaction
-  const isDraggingRef = useRef<boolean>(false);
-  const lastPointerX = useRef<number>(0);
-  const lastPointerY = useRef<number>(0);
-
-  // Smoothly refocus camera when primaryLocation changes
-  useEffect(() => {
-    const newTargetPhi = (-primaryLocation.lng * Math.PI) / 180 - Math.PI / 2;
-    const newTargetTheta = Math.max(-0.4, Math.min(0.6, (primaryLocation.lat * Math.PI) / 180 * 0.7));
-
-    // Calculate shortest angular distance
-    const currentPhi = phiRef.current;
-    let delta = (newTargetPhi - currentPhi) % (2 * Math.PI);
-    if (delta > Math.PI) delta -= 2 * Math.PI;
-    if (delta < -Math.PI) delta += 2 * Math.PI;
-
-    targetPhiRef.current = currentPhi + delta;
-    targetThetaRef.current = newTargetTheta;
-
-    // Update marker pins
-    markersRef.current = buildGlobeMarkers(primaryLocation, secondaryLocation);
-    markersNeedUpdateRef.current = true;
-  }, [primaryLocation, secondaryLocation]);
-
-  useEffect(() => {
-    let width = 0;
-    const currentCanvas = canvasRef.current;
-    if (!currentCanvas) return;
-
-    const onResize = () => {
-      if (currentCanvas) {
-        width = currentCanvas.offsetWidth;
-      }
-    };
-    window.addEventListener('resize', onResize);
-    onResize();
-
-    const globe = createGlobe(currentCanvas, {
-      devicePixelRatio: 2,
-      width: width * 2,
-      height: width * 2,
-      phi: phiRef.current,
-      theta: thetaRef.current,
-      dark: 1,
-      diffuse: 1.2,
-      mapSamples: 16000,
-      mapBrightness: 6,
-      baseColor: [0.08, 0.12, 0.25],
-      markerColor: [0, 0.95, 1], // Default Cyan
-      glowColor: [0.1, 0.4, 0.9],
-      markers: markersRef.current,
-      onRender: (state) => {
-        if (!isDraggingRef.current) {
-          // Smoothly interpolate towards target focus
-          const phiDiff = targetPhiRef.current - phiRef.current;
-          const thetaDiff = targetThetaRef.current - thetaRef.current;
-
-          if (Math.abs(phiDiff) > 0.005 || Math.abs(thetaDiff) > 0.005) {
-            phiRef.current += phiDiff * 0.06;
-            thetaRef.current += thetaDiff * 0.06;
-            if (autoRotate) {
-              targetPhiRef.current += 0.002;
-            }
-          } else if (autoRotate) {
-            // Graceful auto-rotation once aligned
-            phiRef.current += 0.0025;
-            targetPhiRef.current = phiRef.current;
-          }
-        }
-
-        state.phi = phiRef.current;
-        state.theta = thetaRef.current;
-        state.width = width * 2;
-        state.height = width * 2;
-
-        if (markersNeedUpdateRef.current) {
-          state.markers = markersRef.current;
-          markersNeedUpdateRef.current = false;
-        }
-      },
+  // 2. Continental Landmasses
+  const drawLandmass = (points: [number, number][], fill = '#16a34a', stroke = '#15803d') => {
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    points.forEach(([lat, lng], idx) => {
+      const x = toX(lng);
+      const y = toY(lat);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     });
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  };
 
-    return () => {
-      globe.destroy();
-      window.removeEventListener('resize', onResize);
-    };
+  // Eurasia (Europe + Asia)
+  drawLandmass(
+    [
+      [70, 20], [72, 60], [75, 110], [72, 140], [65, 175], [55, 160], [45, 140],
+      [35, 130], [25, 120], [20, 110], [10, 105], [5, 100], [15, 95], [25, 80],
+      [8, 77], [22, 70], [25, 60], [15, 45], [30, 35], [38, 25], [36, -5],
+      [43, -9], [48, -4], [55, 5], [60, 5], [70, 20],
+    ],
+    '#1e7e48',
+    '#14532d'
+  );
+
+  // Scandinavia & UK
+  drawLandmass([[58, 5], [64, 12], [70, 25], [60, 28], [55, 12]], '#14532d');
+  drawLandmass([[50, -5], [58, -4], [55, -2], [50, 0]], '#166534');
+
+  // Africa & Sahara Desert
+  drawLandmass(
+    [
+      [35, -5], [37, 10], [32, 32], [28, 34], [12, 51], [2, 45], [-12, 40],
+      [-25, 33], [-34, 26], [-34, 18], [-20, 12], [-5, 8], [5, 0], [5, -10],
+      [15, -17], [25, -15], [35, -5],
+    ],
+    '#4d7c0f',
+    '#365314'
+  );
+  drawLandmass([[30, -10], [32, 30], [22, 35], [16, 30], [16, -12], [25, -14]], '#92400e', '#78350f');
+
+  // North America
+  drawLandmass(
+    [
+      [72, -155], [70, -130], [60, -90], [55, -55], [45, -60], [35, -75], [25, -80],
+      [22, -97], [15, -92], [20, -105], [30, -115], [38, -123], [48, -125], [58, -140],
+      [65, -165], [72, -155],
+    ],
+    '#1e7e48',
+    '#14532d'
+  );
+
+  // Greenland
+  drawLandmass([[60, -45], [75, -20], [82, -30], [80, -65], [68, -55]], '#f8fafc', '#cbd5e1');
+
+  // South America & Amazon
+  drawLandmass(
+    [
+      [12, -72], [10, -60], [0, -50], [-10, -35], [-23, -42], [-35, -55], [-55, -68],
+      [-50, -75], [-35, -72], [-18, -70], [-5, -80], [8, -77], [12, -72],
+    ],
+    '#14532d',
+    '#052e16'
+  );
+
+  // Australia
+  drawLandmass(
+    [
+      [-12, 131], [-15, 136], [-12, 142], [-22, 150], [-33, 151], [-38, 145],
+      [-35, 135], [-35, 115], [-22, 114], [-15, 125], [-12, 131],
+    ],
+    '#92400e',
+    '#78350f'
+  );
+
+  // Antarctica Ice Shelf
+  drawLandmass([[-65, -180], [-65, 180], [-85, 180], [-90, 0], [-85, -180]], '#f8fafc', '#e2e8f0');
+
+  // 3. Shimmering Night City Lights on continents
+  ctx.fillStyle = '#fef08a';
+  for (const city of CITIES) {
+    const cx = toX(city.lng);
+    const cy = toY(city.lat);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 4. Subtle Celestial Coordinate Grid
+  ctx.strokeStyle = 'rgba(140, 186, 255, 0.18)';
+  ctx.lineWidth = 1;
+
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const y = toY(lat);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  for (let lng = -180; lng <= 180; lng += 45) {
+    const x = toX(lng);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+
+  // Equator Highlight
+  ctx.strokeStyle = 'rgba(254, 160, 130, 0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, toY(0));
+  ctx.lineTo(w, toY(0));
+  ctx.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+// Procedural Cloud Canvas Texture
+function createProceduralCloudTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+
+  for (let i = 0; i < 75; i++) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const r = 20 + Math.random() * 40;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  return texture;
+}
+
+const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function GlobeCanvas(
+  {
+    primaryLocation = { lat: 35.6762, lng: 139.6503, label: 'Tokyo' },
+    secondaryLocation = { lat: 40.7128, lng: -74.006, label: 'New York' },
+    autoRotate = false,
+    focusedTarget = 'earth',
+    className = '',
+  }: GlobeCanvasProps,
+  ref
+) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+
+  const isRotatingRef = useRef<boolean>(autoRotate);
+
+  useEffect(() => {
+    isRotatingRef.current = autoRotate;
   }, [autoRotate]);
 
+  // Live celestial state
+  const [sunCoords, setSunCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [moonState, setMoonState] = useState<{
+    lat: number;
+    lng: number;
+    phase: string;
+    illumination: number;
+    phaseEmoji: string;
+  } | null>(null);
+
+  // Three.js scene refs
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cloudMeshRef = useRef<THREE.Mesh | null>(null);
+  const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const sunMeshRef = useRef<THREE.Group | null>(null);
+  const moonMeshRef = useRef<THREE.Group | null>(null);
+  const primaryPinRef = useRef<THREE.Group | null>(null);
+  const secondaryPinRef = useRef<THREE.Group | null>(null);
+  const flightArcRef = useRef<THREE.Line | null>(null);
+
+  // Camera Orbit Orientation
+  const targetLatRef = useRef<number>(primaryLocation.lat);
+  const targetLngRef = useRef<number>(primaryLocation.lng);
+  const currentLatRef = useRef<number>(primaryLocation.lat);
+  const currentLngRef = useRef<number>(primaryLocation.lng);
+
+  // Camera Zoom Distance (min: 3.2, max: 8.5)
+  const targetDistRef = useRef<number>(5.2);
+  const currentDistRef = useRef<number>(5.2);
+
+  // Expose Zoom and Reset APIs to parent page
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      targetDistRef.current = Math.max(3.2, targetDistRef.current - 0.7);
+    },
+    zoomOut: () => {
+      targetDistRef.current = Math.min(8.5, targetDistRef.current + 0.7);
+    },
+    resetZoom: () => {
+      targetDistRef.current = 5.2;
+    },
+  }));
+
+  // Drag interaction state
+  const isDraggingRef = useRef<boolean>(false);
+  const prevPointerX = useRef<number>(0);
+  const prevPointerY = useRef<number>(0);
+
+  // Shortest-path angle normalization to smoothly pivot camera without wild multi-turn spinning
+  const focusOnCoordinates = useCallback((lat: number, lng: number, distance = 5.2) => {
+    targetLatRef.current = Math.max(-75, Math.min(75, lat));
+    targetDistRef.current = distance;
+
+    const current = currentLngRef.current;
+    const diff = ((((lng - current) % 360) + 540) % 360) - 180;
+    targetLngRef.current = current + diff;
+  }, []);
+
+  // Track previous inputs to ensure camera only pivots on actual user/selection changes
+  const prevTargetRef = useRef<string | undefined>(undefined);
+  const prevCityALatRef = useRef<number>(primaryLocation.lat);
+  const prevCityALngRef = useRef<number>(primaryLocation.lng);
+  const prevCityBLatRef = useRef<number>(secondaryLocation.lat);
+  const prevCityBLngRef = useRef<number>(secondaryLocation.lng);
+
+  // Synchronize camera focus ONLY when target or city coordinates explicitly change
+  useEffect(() => {
+    const targetChanged = prevTargetRef.current !== focusedTarget;
+    const cityAChanged =
+      prevCityALatRef.current !== primaryLocation.lat ||
+      prevCityALngRef.current !== primaryLocation.lng;
+    const cityBChanged =
+      prevCityBLatRef.current !== secondaryLocation.lat ||
+      prevCityBLngRef.current !== secondaryLocation.lng;
+
+    prevTargetRef.current = focusedTarget;
+    prevCityALatRef.current = primaryLocation.lat;
+    prevCityALngRef.current = primaryLocation.lng;
+    prevCityBLatRef.current = secondaryLocation.lat;
+    prevCityBLngRef.current = secondaryLocation.lng;
+
+    if (targetChanged || (focusedTarget === 'primary' && cityAChanged)) {
+      if (focusedTarget === 'primary') {
+        focusOnCoordinates(primaryLocation.lat, primaryLocation.lng, 4.4);
+      }
+    }
+    if (targetChanged || (focusedTarget === 'secondary' && cityBChanged)) {
+      if (focusedTarget === 'secondary') {
+        focusOnCoordinates(secondaryLocation.lat, secondaryLocation.lng, 4.4);
+      }
+    }
+    if (targetChanged && focusedTarget === 'sun' && sunCoords) {
+      focusOnCoordinates(sunCoords.lat, sunCoords.lng, 4.8);
+    }
+    if (targetChanged && focusedTarget === 'moon' && moonState) {
+      focusOnCoordinates(moonState.lat, moonState.lng, 4.8);
+    }
+    if (targetChanged && focusedTarget === 'earth') {
+      targetDistRef.current = 5.2;
+    }
+  }, [
+    focusedTarget,
+    primaryLocation.lat,
+    primaryLocation.lng,
+    secondaryLocation.lat,
+    secondaryLocation.lng,
+    sunCoords,
+    moonState,
+    focusOnCoordinates,
+  ]);
+
+  // 1. Initial Three.js Scene Setup
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container) return;
+
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
+
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    camera.position.set(0, 0, 5.2);
+    cameraRef.current = camera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+    rendererRef.current = renderer;
+    container.appendChild(renderer.domElement);
+
+    // --- Starfield in Space (Deep Space Stars) ---
+    const starsGeo = new THREE.BufferGeometry();
+    const starCount = 2000;
+    const starPositions = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i += 3) {
+      const r = 25 + Math.random() * 50;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      starPositions[i] = r * Math.sin(phi) * Math.cos(theta);
+      starPositions[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+      starPositions[i + 2] = r * Math.cos(phi);
+    }
+    starsGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starsMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.28,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const starField = new THREE.Points(starsGeo, starsMat);
+    scene.add(starField);
+
+    // --- Ambient Light (Crucial: Illuminates the dark side so it is NEVER pitch black nothingness!) ---
+    const ambientLight = new THREE.AmbientLight(0x475569, 0.78);
+    scene.add(ambientLight);
+
+    // --- Sun Directional Light (Physically illuminates day hemisphere) ---
+    const sunLight = new THREE.DirectionalLight(0xfff7ed, 3.2);
+    sunLight.target.position.set(0, 0, 0);
+    scene.add(sunLight);
+    scene.add(sunLight.target);
+    sunLightRef.current = sunLight;
+
+    // --- Earth Sphere ---
+    const earthRadius = 1.45;
+    const earthGeo = new THREE.SphereGeometry(earthRadius, 64, 64);
+    const earthTex = createProceduralEarthTexture();
+    const earthMat = new THREE.MeshStandardMaterial({
+      map: earthTex,
+      roughness: 0.65,
+      metalness: 0.08,
+    });
+    const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+    scene.add(earthMesh);
+
+    // --- Cloud Layer ---
+    const cloudGeo = new THREE.SphereGeometry(earthRadius * 1.015, 64, 64);
+    const cloudTex = createProceduralCloudTexture();
+    const cloudMat = new THREE.MeshStandardMaterial({
+      map: cloudTex,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+    });
+    const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+    scene.add(cloudMesh);
+    cloudMeshRef.current = cloudMesh;
+
+    // --- Atmospheric Limb Glow (Soft Ice-Blue Halo from Solar Explorer #8cbaff) ---
+    const atmoGeo = new THREE.SphereGeometry(earthRadius * 1.05, 48, 48);
+    const atmoMat = new THREE.MeshBasicMaterial({
+      color: 0x8cbaff,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.BackSide,
+    });
+    scene.add(new THREE.Mesh(atmoGeo, atmoMat));
+
+    // --- Dashed Orbital Trajectory Ring for Moon (Directly inspired by .trajectory in attached CSS) ---
+    const orbitPoints: THREE.Vector3[] = [];
+    for (let i = 0; i <= 64; i++) {
+      const angle = (i / 64) * Math.PI * 2;
+      orbitPoints.push(
+        new THREE.Vector3(Math.cos(angle) * 2.35, Math.sin(angle) * 0.25, Math.sin(angle) * 2.35)
+      );
+    }
+    const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+    const orbitMat = new THREE.LineDashedMaterial({
+      color: 0x8cbaff,
+      dashSize: 0.15,
+      gapSize: 0.1,
+      transparent: true,
+      opacity: 0.35,
+    });
+    const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+    orbitLine.computeLineDistances();
+    scene.add(orbitLine);
+
+    // --- Geodesic Flight Arc connecting Location A & Location B ---
+    const flightArcMat = new THREE.LineDashedMaterial({
+      color: 0xfea082,
+      dashSize: 0.08,
+      gapSize: 0.05,
+      transparent: true,
+      opacity: 0.75,
+    });
+    const flightArc = new THREE.Line(new THREE.BufferGeometry(), flightArcMat);
+    scene.add(flightArc);
+    flightArcRef.current = flightArc;
+
+    // --- 3D Sun in Space ---
+    const sunGroup = new THREE.Group();
+    const sunCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.25, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfff7ed })
+    );
+    sunGroup.add(sunCore);
+
+    const corona = new THREE.Mesh(
+      new THREE.SphereGeometry(0.40, 24, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0xf39041,
+        transparent: true,
+        opacity: 0.45,
+        side: THREE.BackSide,
+      })
+    );
+    sunGroup.add(corona);
+
+    const sunSprite = createMarkerSprite('☀️ SUN', '#fea082', 'rgba(0, 0, 0, 0.85)');
+    sunSprite.position.set(0, 0.48, 0);
+    sunGroup.add(sunSprite);
+
+    scene.add(sunGroup);
+    sunMeshRef.current = sunGroup;
+
+    // --- 3D Moon in Space ---
+    const moonGroup = new THREE.Group();
+    const moonMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 32, 32),
+      new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        roughness: 0.8,
+        metalness: 0.05,
+      })
+    );
+    moonGroup.add(moonMesh);
+
+    const moonHalo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 24, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0x8cbaff,
+        transparent: true,
+        opacity: 0.28,
+        side: THREE.BackSide,
+      })
+    );
+    moonGroup.add(moonHalo);
+
+    const moonSprite = createMarkerSprite('🌙 MOON', '#ffffff', 'rgba(0, 0, 0, 0.85)');
+    moonSprite.position.set(0, 0.35, 0);
+    moonGroup.add(moonSprite);
+
+    scene.add(moonGroup);
+    moonMeshRef.current = moonGroup;
+
+    // --- Location Pin Factory ---
+    const createPin = (color: number) => {
+      const group = new THREE.Group();
+      const markerGeo = new THREE.SphereGeometry(0.045, 16, 16);
+      const markerMat = new THREE.MeshBasicMaterial({ color });
+      group.add(new THREE.Mesh(markerGeo, markerMat));
+
+      const ringGeo = new THREE.RingGeometry(0.065, 0.085, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      group.add(ring);
+
+      return group;
+    };
+
+    const primaryPin = createPin(0x38bdf8); // Sky Ice Pin
+    const secondaryPin = createPin(0xfea082); // Starlight Gold Pin
+    scene.add(primaryPin);
+    scene.add(secondaryPin);
+    primaryPinRef.current = primaryPin;
+    secondaryPinRef.current = secondaryPin;
+
+    // --- Wheel Event for Smooth Zooming ---
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomDelta = e.deltaY * 0.003;
+      targetDistRef.current = Math.max(3.2, Math.min(8.5, targetDistRef.current + zoomDelta));
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    // --- Animation & Render Loop ---
+    let animationFrameId: number;
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+
+      currentLatRef.current += (targetLatRef.current - currentLatRef.current) * 0.07;
+      currentLngRef.current += (targetLngRef.current - currentLngRef.current) * 0.07;
+      currentDistRef.current += (targetDistRef.current - currentDistRef.current) * 0.08;
+
+      if (isRotatingRef.current && !isDraggingRef.current) {
+        targetLngRef.current += 0.07;
+      }
+
+      if (cloudMeshRef.current) {
+        cloudMeshRef.current.rotation.y += 0.0004;
+      }
+
+      const camPos = latLngToVector3(
+        currentLatRef.current,
+        currentLngRef.current,
+        currentDistRef.current
+      );
+      camera.position.copy(camPos);
+      camera.lookAt(0, 0, 0);
+
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const handleResize = () => {
+      if (!container || !rendererRef.current || !cameraRef.current) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      cameraRef.current.aspect = w / h;
+      cameraRef.current.updateProjectionMatrix();
+      rendererRef.current.setSize(w, h);
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      container.removeEventListener('wheel', handleWheel);
+      renderer.dispose();
+      if (container && renderer.domElement) {
+        container.removeChild(renderer.domElement);
+      }
+    };
+  }, []);
+
+  // 2. Synchronize Real-Time Sun, Moon & Location Positions
+  useEffect(() => {
+    const updatePositions = () => {
+      const now = new Date();
+      const sun = getSubsolarPoint(now);
+      const moon = getSublunarPoint(now);
+
+      setSunCoords(sun);
+      setMoonState(moon);
+
+      const earthRadius = 1.45;
+
+      // Position Directional Sun Light
+      const sunVec = latLngToVector3(sun.lat, sun.lng, 1);
+      if (sunLightRef.current) {
+        sunLightRef.current.position.set(sunVec.x * 20, sunVec.y * 20, sunVec.z * 20);
+      }
+
+      // Position 3D Sun Orb in space
+      if (sunMeshRef.current) {
+        sunMeshRef.current.position.set(sunVec.x * 2.7, sunVec.y * 2.7, sunVec.z * 2.7);
+      }
+
+      // Position 3D Moon Orb in space
+      const moonVec = latLngToVector3(moon.lat, moon.lng, 1);
+      if (moonMeshRef.current) {
+        moonMeshRef.current.position.set(moonVec.x * 2.35, moonVec.y * 2.35, moonVec.z * 2.35);
+      }
+
+      // Position Primary and Secondary City Pins
+      if (primaryPinRef.current) {
+        const pVec = latLngToVector3(primaryLocation.lat, primaryLocation.lng, earthRadius * 1.012);
+        primaryPinRef.current.position.copy(pVec);
+        primaryPinRef.current.lookAt(pVec.clone().multiplyScalar(2));
+      }
+      if (secondaryPinRef.current) {
+        const sVec = latLngToVector3(secondaryLocation.lat, secondaryLocation.lng, earthRadius * 1.012);
+        secondaryPinRef.current.position.copy(sVec);
+        secondaryPinRef.current.lookAt(sVec.clone().multiplyScalar(2));
+      }
+
+      // Update Geodesic Flight Arc between Location A and Location B
+      if (flightArcRef.current) {
+        flightArcRef.current.geometry.dispose();
+        flightArcRef.current.geometry = createGreatCircleArc(
+          primaryLocation.lat,
+          primaryLocation.lng,
+          secondaryLocation.lat,
+          secondaryLocation.lng,
+          earthRadius
+        );
+        flightArcRef.current.computeLineDistances();
+      }
+    };
+
+    updatePositions();
+    const interval = setInterval(updatePositions, 3000);
+    return () => clearInterval(interval);
+  }, [primaryLocation.lat, primaryLocation.lng, secondaryLocation.lat, secondaryLocation.lng]);
+
+  // Pointer drag to orbit camera around Earth, Sun & Moon
+  const handlePointerDown = (e: React.PointerEvent) => {
+    isDraggingRef.current = true;
+    prevPointerX.current = e.clientX;
+    prevPointerY.current = e.clientY;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDraggingRef.current) return;
+    const deltaX = e.clientX - prevPointerX.current;
+    const deltaY = e.clientY - prevPointerY.current;
+    prevPointerX.current = e.clientX;
+    prevPointerY.current = e.clientY;
+
+    targetLngRef.current -= deltaX * 0.42;
+    targetLatRef.current = Math.max(-75, Math.min(75, targetLatRef.current + deltaY * 0.32));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    isDraggingRef.current = false;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      // Ignore
+    }
+  };
+
   return (
-    <div
-      className="relative w-full aspect-square max-w-[500px] mx-auto flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
-      onPointerDown={(e) => {
-        isDraggingRef.current = true;
-        lastPointerX.current = e.clientX;
-        lastPointerY.current = e.clientY;
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-      }}
-      onPointerMove={(e) => {
-        if (!isDraggingRef.current) return;
-        const dx = e.clientX - lastPointerX.current;
-        const dy = e.clientY - lastPointerY.current;
-        lastPointerX.current = e.clientX;
-        lastPointerY.current = e.clientY;
-
-        phiRef.current += dx * 0.005;
-        targetPhiRef.current = phiRef.current;
-
-        thetaRef.current = Math.max(-0.6, Math.min(0.8, thetaRef.current - dy * 0.005));
-        targetThetaRef.current = thetaRef.current;
-      }}
-      onPointerUp={(e) => {
-        if (isDraggingRef.current) {
+    <div className={`relative w-full h-full flex flex-col items-center justify-center select-none overflow-hidden ${className}`}>
+      {/* Three.js Canvas Mount */}
+      <div
+        ref={mountRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
           isDraggingRef.current = false;
-          try {
-            (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-          } catch {
-            // Ignore capture error
-          }
-        }
-      }}
-      onPointerCancel={() => {
-        isDraggingRef.current = false;
-      }}
-    >
-      {/* Outer ambient glow */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-500/20 via-purple-600/20 to-blue-600/15 blur-3xl pointer-events-none" />
-
-      {/* Top Constellation Indicator Pill */}
-      <div className="absolute top-2 inset-x-0 flex items-center justify-center pointer-events-none z-10">
-        <div className="glass-panel px-3 py-1 rounded-full text-[11px] font-mono text-cyan-300/80 border border-white/10 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm shadow-md shadow-black/40">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-          <span>3D Constellation: {CITIES.length} Global Hubs Active</span>
-        </div>
-      </div>
-
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full opacity-90 transition-opacity duration-500"
-        style={{ width: '100%', height: '100%', contain: 'layout paint size' }}
+        }}
+        className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
       />
-
-      {/* Floating Pills for Radiant Highlighted Pins */}
-      <div className="absolute bottom-2 inset-x-0 flex flex-wrap items-center justify-center gap-3 px-3 pointer-events-none z-10">
-        {/* Primary Pin Badge */}
-        <div className="glass-panel px-3.5 py-1.5 rounded-full text-xs flex items-center gap-2.5 border border-cyan-400/40 bg-cyan-950/40 shadow-lg shadow-cyan-500/20 backdrop-blur-md">
-          <span className="relative flex h-3 w-3 items-center justify-center">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
-          </span>
-          <span className="text-gray-200 font-medium text-[11px] sm:text-xs">
-            Primary: <strong className="text-cyan-300 font-bold tracking-wide">{primaryLocation.label}</strong>
-          </span>
-        </div>
-
-        {/* Target Pin Badge */}
-        <div className="glass-panel px-3.5 py-1.5 rounded-full text-xs flex items-center gap-2.5 border border-purple-400/40 bg-purple-950/40 shadow-lg shadow-purple-500/20 backdrop-blur-md">
-          <span className="relative flex h-3 w-3 items-center justify-center">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-400 shadow-[0_0_8px_#c084fc]" />
-          </span>
-          <span className="text-gray-200 font-medium text-[11px] sm:text-xs">
-            Target: <strong className="text-purple-300 font-bold tracking-wide">{secondaryLocation.label}</strong>
-          </span>
-        </div>
-      </div>
     </div>
   );
-}
+});
+
+export default GlobeCanvas;

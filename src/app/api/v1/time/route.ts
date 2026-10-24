@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { validateApiKey, checkRateLimit } from '@/lib/apiKey';
-import { findCity } from '@/lib/cities';
+import { findCity, findNearestCity } from '@/lib/cities';
 import { getCityTime } from '@/lib/timeEngine';
 import { ApiLog } from '@/models/ApiLog';
 
@@ -41,8 +41,23 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const location = searchParams.get('location') || 'London';
-  const city = findCity(location);
+  const latParam = searchParams.get('lat');
+  const lngParam = searchParams.get('lng');
+  const location = searchParams.get('location') || searchParams.get('city') || searchParams.get('q') || '';
+  let city = null;
+
+  if (latParam && lngParam) {
+    const lat = parseFloat(latParam);
+    const lng = parseFloat(lngParam);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      city = findNearestCity(lat, lng);
+    }
+  }
+
+  if (!city) {
+    const query = location || 'London';
+    city = findCity(query);
+  }
 
   if (!city) {
     const responseTimeMs = Date.now() - startTime;

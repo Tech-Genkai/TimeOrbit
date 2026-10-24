@@ -53,27 +53,26 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    { name: '3D Globe', href: '/', icon: Globe2 },
+    { name: '3D Earth', href: '/', icon: Globe2 },
     { name: 'Compare Studio', href: '/compare', icon: Clock },
     { name: 'API Docs', href: '/docs', icon: BookOpen },
     { name: 'Dashboard', href: '/dashboard', icon: Key },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full glass-panel border-b border-white/10 transition-all">
+    <header className="sticky top-0 z-50 w-full bg-black/80 backdrop-blur-xl border-b border-white/10 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand Logo */}
+        {/* Brand Logo (Inspired by Solar Explorer .logo) */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-            <Globe2 className="w-5 h-5 text-white animate-spin-slow" />
-            <div className="absolute -inset-0.5 rounded-xl bg-cyan-400 opacity-30 blur-sm group-hover:opacity-60 transition-opacity" />
+          <div className="relative w-8 h-8 rounded-full bg-white/5 border border-white/20 flex items-center justify-center group-hover:border-[#fea082] transition-colors">
+            <Globe2 className="w-4 h-4 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-cyan-100 to-cyan-400 bg-clip-text text-transparent">
+            <span className="font-light text-sm sm:text-base tracking-[0.25em] text-white uppercase group-hover:text-[#fea082] transition-colors">
               TimeOrbit
             </span>
-            <span className="text-[10px] text-cyan-400/80 -mt-1 tracking-wider uppercase font-semibold">
-              Global Time API
+            <span className="text-[9px] text-[#fea082] tracking-[0.2em] uppercase font-light -mt-0.5">
+              Planetary Time & Orbit
             </span>
           </div>
         </Link>
@@ -87,33 +86,30 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs tracking-[0.14em] uppercase transition-all ${
                   isActive
-                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
-                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                    ? 'text-white border-b-2 border-[#fea082] bg-white/5 font-medium'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/5 font-light'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-gray-400'}`} />
-                {link.name}
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#fea082]' : 'text-zinc-500'}`} />
+                <span>{link.name}</span>
               </Link>
             );
           })}
 
-          {/* Admin Panel Link (Only visible if user.role === 'admin') */}
+          {/* Admin Panel Link */}
           {user?.role === 'admin' && (
             <Link
               href="/admin"
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs tracking-[0.14em] uppercase transition-all ${
                 pathname === '/admin'
-                  ? 'bg-purple-600/25 text-purple-200 border border-purple-500/50 shadow-sm shadow-purple-500/20'
-                  : 'text-purple-300 hover:text-white hover:bg-purple-900/30 border border-purple-500/20'
+                  ? 'bg-purple-950/40 text-purple-200 border border-purple-500/50'
+                  : 'text-purple-300 hover:text-white hover:bg-purple-950/20 border border-purple-500/20'
               }`}
             >
-              <ShieldCheck className="w-4 h-4 text-purple-400 animate-pulse" />
-              <span>Admin Panel</span>
-              <span className="px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded bg-purple-500/30 text-purple-300 border border-purple-400/30 font-bold">
-                Admin
-              </span>
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Admin</span>
             </Link>
           )}
         </nav>
@@ -121,22 +117,19 @@ export default function Navbar() {
         {/* User Actions */}
         <div className="hidden md:flex items-center gap-3">
           {loading ? (
-            <div className="w-24 h-8 bg-white/5 rounded-lg animate-pulse" />
+            <div className="w-20 h-7 bg-white/5 rounded-lg animate-pulse" />
           ) : user ? (
             <div className="flex items-center gap-3">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-sm group"
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-xs text-zinc-300 hover:text-white group"
               >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-500/30 to-purple-500/30 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold text-xs">
+                <div className="w-6 h-6 rounded-full bg-white/10 border border-white/20 text-[#fea082] flex items-center justify-center font-bold text-[10px]">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left hidden lg:block">
-                  <div className="text-xs font-semibold text-gray-200 group-hover:text-cyan-300 transition-colors">
+                  <div className="text-xs font-light tracking-wider text-white">
                     {user.name}
-                  </div>
-                  <div className="text-[10px] text-gray-400">
-                    {user.role === 'admin' ? '🛡️ Super Admin' : 'Developer'}
                   </div>
                 </div>
               </Link>
@@ -144,7 +137,7 @@ export default function Navbar() {
               <button
                 onClick={handleLogout}
                 title="Log out"
-                className="p-2 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all"
+                className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-white/5 transition-all cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -153,16 +146,16 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-all"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-light tracking-[0.14em] uppercase text-zinc-400 hover:text-white transition-all"
               >
                 Sign In
               </Link>
               <Link
                 href="/register"
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold glow-btn"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs glow-btn"
               >
-                <span>Get API Key</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>API Key</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           )}
@@ -172,7 +165,7 @@ export default function Navbar() {
         <div className="flex md:hidden items-center">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+            className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -181,68 +174,36 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-white/10 bg-[#060814]/95 backdrop-blur-xl px-4 py-4 space-y-2">
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium ${
-                  pathname === link.href ? 'bg-cyan-500/20 text-cyan-300' : 'text-gray-300 hover:bg-white/5'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {link.name}
-              </Link>
-            );
-          })}
-
-          {user?.role === 'admin' && (
+        <div className="md:hidden border-t border-white/10 bg-black/95 px-4 py-4 space-y-3">
+          {navLinks.map((link) => (
             <Link
-              href="/admin"
+              key={link.href}
+              href={link.href}
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold text-purple-300 bg-purple-900/30 border border-purple-500/30"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs tracking-wider uppercase text-zinc-300 hover:text-white hover:bg-white/5"
             >
-              <ShieldCheck className="w-4 h-4 text-purple-400" />
-              <span>Admin Panel</span>
+              <link.icon className="w-4 h-4 text-[#fea082]" />
+              <span>{link.name}</span>
             </Link>
+          ))}
+          {!user && (
+            <div className="pt-2 flex gap-2">
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex-1 py-2 text-center text-xs tracking-wider uppercase border border-white/20 rounded-lg text-white"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex-1 py-2 text-center text-xs glow-btn rounded-lg"
+              >
+                Register
+              </Link>
+            </div>
           )}
-
-          <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
-            {user ? (
-              <>
-                <div className="px-3 py-2 text-xs text-gray-400">
-                  Signed in as <span className="text-white font-medium">{user.email}</span>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-rose-300 bg-rose-500/10 rounded-lg"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2 text-sm text-gray-200 bg-white/5 rounded-lg"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2 text-sm font-semibold glow-btn rounded-lg"
-                >
-                  Get API Key
-                </Link>
-              </div>
-            )}
-          </div>
         </div>
       )}
     </header>

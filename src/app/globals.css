@@ -1,101 +1,162 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap");
 @import "tailwindcss";
 
 :root {
-  --background: #060814;
-  --foreground: #f0f4fc;
-  --card-bg: rgba(13, 17, 34, 0.75);
-  --card-border: rgba(255, 255, 255, 0.08);
-  --accent-cyan: #00f2fe;
-  --accent-purple: #9d4edd;
-  --accent-emerald: #10b981;
-  --accent-amber: #f59e0b;
+  --background: #000000;
+  --foreground: #f8fafc;
+  --space-gold: #fea082;
+  --space-accent: #f39041;
+  --space-ice: #8cbaff;
+  --space-card: rgba(10, 15, 29, 0.7);
+  --space-border: rgba(255, 255, 255, 0.12);
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: #000000;
+  color: #f8fafc;
   min-height: 100vh;
   overflow-x: hidden;
+  font-family: "Montserrat", -apple-system, BlinkMacSystemFont, sans-serif;
   background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.18), transparent 70%),
-    radial-gradient(circle at 85% 30%, rgba(0, 242, 254, 0.06), transparent 40%),
-    radial-gradient(circle at 15% 70%, rgba(157, 78, 221, 0.08), transparent 45%);
+    radial-gradient(circle at 50% 10%, rgba(20, 30, 55, 0.45), transparent 60%),
+    radial-gradient(ellipse 70% 40% at 80% 30%, rgba(140, 186, 255, 0.05), transparent 50%),
+    radial-gradient(circle at 20% 80%, rgba(243, 144, 65, 0.04), transparent 50%);
   background-attachment: fixed;
 }
 
-/* Glassmorphism Classes */
+/* Space-Theme Glassmorphism Classes */
 .glass-panel {
-  background: rgba(13, 18, 38, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  background: rgba(10, 14, 26, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7);
 }
 
 .glass-card {
-  background: rgba(18, 24, 48, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(13, 18, 32, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
-  border-color: rgba(0, 242, 254, 0.3);
+  border-color: rgba(254, 160, 130, 0.4);
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px -4px rgba(0, 242, 254, 0.12);
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.8), 0 0 20px 2px rgba(254, 160, 130, 0.1);
 }
 
 .glass-input {
-  background: rgba(8, 12, 28, 0.8);
+  background: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f0f4fc;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  color: #ffffff;
+  transition: all 0.2s ease;
 }
 
 .glass-input:focus {
   outline: none;
-  border-color: #00f2fe;
-  box-shadow: 0 0 12px rgba(0, 242, 254, 0.25);
+  border-color: #fea082;
+  box-shadow: 0 0 0 2px rgba(254, 160, 130, 0.2);
 }
 
-/* Glowing Neon Text & Accents */
-.text-glow-cyan {
-  text-shadow: 0 0 12px rgba(0, 242, 254, 0.5);
+/* Space Typography Helpers (Inspired by Solar Explorer) */
+.space-title {
+  font-weight: 200;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
-.text-glow-purple {
-  text-shadow: 0 0 12px rgba(157, 78, 221, 0.5);
+.space-subtitle {
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #fea082;
 }
 
+.space-label {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.pip {
+  display: inline-block;
+  width: 14px;
+  height: 6px;
+  background: #fea082;
+  border-radius: 3px;
+  margin-right: 8px;
+  transition: all 0.3s ease;
+}
+
+/* Refined Minimalist Space Buttons */
 .glow-btn {
-  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-  color: #060814;
+  background: linear-gradient(135deg, #fea082 0%, #f39041 100%);
+  color: #000000;
   font-weight: 600;
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.35);
-  transition: all 0.2s ease;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 20px rgba(243, 144, 65, 0.25);
+  transition: all 0.25s ease;
 }
 
 .glow-btn:hover {
-  box-shadow: 0 0 28px rgba(0, 242, 254, 0.6);
+  box-shadow: 0 6px 28px rgba(243, 144, 65, 0.45);
   transform: translateY(-1px);
 }
 
-/* Custom Scrollbar */
+.space-btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: all 0.25s ease;
+}
+
+.space-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Dashed Trajectory Arc Animation */
+@keyframes dash-pulse {
+  0% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
+
+.trajectory-ring {
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  animation: dash-pulse 4s infinite ease-in-out;
+}
+
+/* Minimalist Dark Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(6, 8, 20, 0.8);
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 242, 254, 0.4);
+  background: rgba(255, 255, 255, 0.4);
 }
