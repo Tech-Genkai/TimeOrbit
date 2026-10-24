@@ -48,22 +48,30 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 
 ## 🚀 Key Features
 
-### 🌐 Interactive 3D WebGL Globe
-- Physics-damped interactive globe powered by WebGL/Cobe.
-- 38 world city constellation markers across Asia, Europe, Americas, Oceania, and Africa.
-- Real-time night/day solar illumination terminator and dynamic city camera focusing.
+### 🌐 Full-Page Interactive 3D Three.js Celestial Stage
+- Custom **Three.js WebGL Celestial Engine** (`GlobeCanvas.tsx`) rendering an immersive 100vh full-page space environment.
+- **Dynamic Day/Night Shading**: Real-time solar terminator separating daytime illumination from the dark hemisphere.
+- **Night City Lights & Lat/Lng Grid**: Realistic illuminated nocturnal city clusters and coordinate grid lines on Earth's dark side.
+- **2,000-Star Deep Space Field**: Procedural starfield with depth and realistic starlight ambiance.
+- **Live Sun & Moon In Space**:
+  - 3D Sun positioned at calculated real-time subsolar zenith coordinates with solar flare corona.
+  - 3D Moon orbiting on a dashed trajectory ring, with live sublunar position and lunar phase illumination (0–100%).
+- **Geodesic Flight Arc**: 3D curved trajectory arc physically connecting Location A and Location B across Earth's surface.
+- **Shortest-Path Camera Gliding**: Normalized angle interpolation (`((((lng - current) % 360) + 540) % 360) - 180`) for smooth transitions without wild multi-turn spinning.
+- **Continuous Auto-Rotation**: Frictionless, continuous orbital rotation with zoom controls (`+` / `-`) and mouse-wheel support.
 
-### ☀️ Astronomical Solar Cycle Tracking
-- Calculates solar elevation angles and day/night cycles for any coordinate on Earth.
-- Classifies each city into real-time solar phases:
-  - **Day** ☀️ (`elevation >= 0°`)
-  - **Night** 🌙 (`elevation < -6°`)
-  - **Dawn / Dusk** 🌅/🌇 (twilight transition intervals)
+### 🏙️ 48 Global Metropolitan Hubs & GPS Geolocation
+- Expanded catalog of **48 world cities** categorized across 6 continental regions (Asia & South Asia, Europe, North America, Latin America, Oceania & Pacific, Africa).
+- **One-Click GPS Auto-Detection**: Instant geolocation via `navigator.geolocation` with automatic fallback to nearest timezone metropolitan hub.
+- **Instant City Switching & Swap (⇄)**: Seamlessly toggle or swap primary and secondary focus from the Left Celestial Menu, Floating Clocks Dock, or directory cards.
 
-### ⏱️ Timezone Comparison & 24-Hour Scrubber (`/compare`)
-- Visual 24-hour comparative timeline slider.
-- Automated team overlap advisor highlighting mutual working windows (09:00 - 18:00).
-- Precise handling of fractional offsets (`+05:30`, `+05:45`) and cross-day boundary badges (`+1 Day`, `-1 Day`).
+### ⏱️ Synchronized Dual Clocks & 24-Hour Working Overlap Matrix
+- Floating dual clock cards with digital time, UTC offset, timezone abbreviations, and live coordinates.
+- **Synchronized Column Grid Dock**: Dedicated column alignment for Location A and Location B dropdowns with styled custom chevron indicators.
+- **24-Hour Scrubber**: Interactive slider to simulate any time of day and visualize cross-continental working overlaps (09:00 - 18:00) with fractional offsets (`+05:30`, `+05:45`) and cross-day boundary indicators (`+1 Day`, `-1 Day`).
+
+### 🔭 Slide-Out Celestial Observatory Panel
+- Real-time astronomical telemetry deck displaying Sun & Moon altitude, azimuth, solar noon, dawn/dusk twilight times, and exact coordinates.
 
 ### 🔑 Developer REST API & Sandbox (`/docs`)
 - Dedicated REST API (`/api/v1/*`) with standard JSON envelopes and HTTP status codes.
@@ -97,7 +105,7 @@ flowchart TD
 
     subgraph CoreEngine["In-House Local Domain Engine"]
         TimeEngine["timeEngine.ts (Solar & Time Calculations)"]
-        CityData["cities.ts (38 Global Hubs)"]
+        CityData["cities.ts (48 Global Hubs)"]
     end
 
     subgraph APIRoutes["Next.js Route Handlers (/api)"]
@@ -144,7 +152,7 @@ flowchart TD
 | **UI Library** | [React 19](https://react.dev/) | Modern concurrent UI architecture |
 | **Language** | [TypeScript 5](https://www.typescriptlang.org/) | Strict static typing across domain, models, and routes |
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) | Custom dark mode glassmorphic styling |
-| **3D Graphics** | [Cobe](https://github.com/shuding/cobe) / WebGL | Lightweight, high-performance canvas globe rendering |
+| **3D Graphics** | [Three.js](https://threejs.org/) (r183) & WebGL | Custom celestial observatory engine with Earth textures, stars, Moon orbit, and flight arcs |
 | **Icons** | [Lucide React](https://lucide.dev/) | Clean, consistent SVG icon set |
 | **Database** | [MongoDB](https://www.mongodb.com/) via [Mongoose 8](https://mongoosejs.com/) | Document persistence with pooled connections |
 | **Security** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | JWT session verification & salted password hashing |

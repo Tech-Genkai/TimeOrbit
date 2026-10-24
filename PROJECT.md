@@ -27,6 +27,12 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | 12 | `timeEngine.ts` Automated Test Suite | Unit tests covering UTC conversions, negative offsets, fractional offsets, DST transitions, solar cycles, day boundaries, and leap years | M4 | Survey (Explorer 3) |
 | 13 | `apiKey.ts` Rate Limiting & Auth Test Suite | Implement rate limit enforcement in `src/lib/apiKey.ts` and test key generation, hashing, statuses, and 429 exhaustion | M4 | Survey (Explorer 3) |
 | 14 | REST Endpoints Automated Verification | Functional in-memory test suite for `/api/v1/time`, `/api/v1/compare`, `/api/v1/zones`, and `/api/analytics` | M4 | Survey (Explorer 3) |
+| 15 | Three.js Celestial Stage Engine | Full-screen 100vh 3D space stage with Earth day/night procedural lighting, night city lights, 2,000 deep space stars, Moon orbit, Sun zenith, and flight arcs | M5 | User Request |
+| 16 | 48 Global Metropolitan Hubs & GPS | Expand city directory to 48 worldwide hubs across 6 continental regions with browser GPS auto-detection | M5 | User Request |
+| 17 | Shortest-Path Camera Normalization | Angle normalization `((((lng - current) % 360) + 540) % 360) - 180` to prevent multi-turn spinning when switching locations | M5 | User Request |
+| 18 | Synchronized Dual Clocks Dock | Redesign bottom floating dock with synchronized column grid, custom `<ChevronDown />` selects, and centered time difference summary | M5 | User Request |
+| 19 | Continuous Orbit Auto-Rotation Fix | Eliminate tick-induced snapback in auto-rotation via target change ref tracking and memoized location objects | M5 | User Request |
+| 20 | Slide-Out Celestial Observatory Panel | Live astronomical telemetry panel with solar elevation, azimuth, dawn/dusk twilight times, and lunar illumination metrics | M5 | User Request |
 
 ---
 
@@ -37,6 +43,7 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | M2 | API Analytics & Dashboard Integration | Implement `src/app/api/analytics/route.ts` with dual auth, role scoping, MongoDB aggregations, update route logging, wire user and admin dashboards | M1 | DONE |
 | M3 | Feature Polish & UI Enhancements | Fix half-hour timezone scrubber math and add day boundary indicators in `compare/page.tsx`, polish `GlobeCanvas.tsx` constellation markers and camera controls | M1 | DONE |
 | M4 | Automated Test Suite & E2E Hardening | Configure test runner, implement rate limiting in `apiKey.ts`, build comprehensive test suites for `timeEngine`, `apiKey`, and all REST endpoints with 100% pass rate | M1, M2 | DONE |
+| M5 | 3D Space Celestial Stage & UI Redesign | Full 100vh Three.js celestial stage, 48 global cities, shortest-path camera navigation, synchronized clocks dock, uninterrupted auto-rotation, and space theme | M3, M4 | DONE |
 
 ---
 
