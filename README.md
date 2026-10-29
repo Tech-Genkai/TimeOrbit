@@ -5,10 +5,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_8.10-green?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
-[![Test Suite](https://img.shields.io/badge/Tests-63%2F63%20Passed-brightgreen?style=for-the-badge&logo=vitest)](./tests)
+[![Test Suite](https://img.shields.io/badge/Tests-72%2F72%20Passed-brightgreen?style=for-the-badge&logo=vitest)](./tests)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](./LICENSE)
 
-**TimeOrbit** is an open-source, interactive 3D WebGL global timezone explorer and developer platform. It combines real-time astronomical solar calculations, a multi-city time comparison matrix with working-hours overlap detection, and a high-throughput developer REST API backed by SHA-256 API key authentication, rolling-window rate limiting, and real-time telemetry analytics.
+**TimeOrbit** is an open-source, interactive 3D WebGL global timezone explorer, live desktop observatory, and developer platform. It combines real-time astronomical solar calculations, a multi-city time comparison matrix with working-hours overlap detection, a dedicated Windows desktop live wallpaper, and a high-throughput developer REST API backed by SHA-256 API key authentication, an **O(1) Token Bucket Rate Limiter**, and real-time telemetry analytics.
 
 ---
 
@@ -28,6 +28,8 @@
   - [2. Timezone Comparison (`GET /api/v1/compare`)](#2-timezone-comparison-get-apiv1compare)
   - [3. Supported Zones (`GET /api/v1/zones`)](#3-supported-zones-get-apiv1zones)
   - [4. Usage Analytics (`GET /api/analytics`)](#4-usage-analytics-get-apianalytics)
+  - [5. Rate Limiting Engines (Token Bucket vs Sliding Window)](#5-rate-limiting-engines-token-bucket-vs-sliding-window)
+- [Windows Live Desktop Wallpaper](#-windows-live-desktop-wallpaper)
 - [Developer Dashboard & Key Management](#-developer-dashboard--key-management)
 - [Testing & Quality Assurance](#-testing--quality-assurance)
 - [Project Directory Layout](#-project-directory-layout)
@@ -42,7 +44,9 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 **TimeOrbit** solves this with an **in-house computational engine** (`src/lib/timeEngine.ts`):
 - **Zero External Runtime API Dependencies**: All timezone conversions, solar elevation angles, daylight calculations, and overlap matrices execute locally in sub-millisecond compute time.
 - **Interactive Visual Scrubber**: Instant visual detection of mutual working hours across continents.
-- **Developer-First Infrastructure**: Self-service API keys, rolling 60-second rate limiting, in-browser sandbox playground, and real-time usage telemetry.
+- **High-Throughput Token Bucket Architecture**: $O(1)$ in-memory mathematical rate limiting with burst-handling capabilities.
+- **Cross-Platform & Offline Living Desktop**: Native standalone Windows live wallpaper (`wallpaper/index.html`) with dual city dropdowns and offline WebGL Three.js rendering.
+- **Developer-First Infrastructure**: Self-service API keys, universal CORS sharing, in-browser sandbox playground, and real-time usage telemetry.
 
 ---
 
@@ -60,10 +64,24 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 - **Shortest-Path Camera Gliding**: Normalized angle interpolation (`((((lng - current) % 360) + 540) % 360) - 180`) for smooth transitions without wild multi-turn spinning.
 - **Continuous Auto-Rotation**: Frictionless, continuous orbital rotation with zoom controls (`+` / `-`) and mouse-wheel support.
 
-### 🏙️ 48 Global Metropolitan Hubs & GPS Geolocation
-- Expanded catalog of **48 world cities** categorized across 6 continental regions (Asia & South Asia, Europe, North America, Latin America, Oceania & Pacific, Africa).
+### 🏙️ 70+ Global Metropolitan Hubs & GPS Geolocation
+- Comprehensive catalog of **70+ world cities** categorized across all continents.
 - **One-Click GPS Auto-Detection**: Instant geolocation via `navigator.geolocation` with automatic fallback to nearest timezone metropolitan hub.
 - **Instant City Switching & Swap (⇄)**: Seamlessly toggle or swap primary and secondary focus from the Left Celestial Menu, Floating Clocks Dock, or directory cards.
+
+### 🪟 Windows Desktop Live Wallpaper & Clean Observatory Mode
+- **Standalone Offline WebGL App (`wallpaper/index.html`)**: Run as a desktop background via Lively Wallpaper or Wallpaper Engine with zero network requirements.
+- **Dual City Selectors**: Interactive glassmorphic dropdowns directly in the bottom dock to select Origin and Target cities on the fly.
+- **Desktop-Optimized Clean View**: Header-free layout keeping upper screen area unobstructed for desktop icons.
+- **Double-Click Clean Mode**: Double-click anywhere to instantly toggle HUD visibility.
+- **Dedicated Web Route (`/wallpaper`)**: Web-based wallpaper mode matching desktop experience.
+
+### ⚡ Enterprise Token Bucket Rate Limiting Engine
+- **$O(1)$ In-Memory Mathematical Execution**: Replaces heavy database queries with instantaneous token calculations ($\Delta t \times r$).
+- **Continuous Token Replenishment**: Refills at $\frac{\text{limit}}{60}\text{ tokens/sec}$ based on wall-clock elapsed milliseconds.
+- **Burst Tolerance**: Configurable `burstMultiplier` allowing clients to handle traffic spikes without 429 throttling.
+- **Bounded Memory Safety**: Built-in automatic LRU eviction pruning inactive buckets after 15 minutes.
+- **Dual-Engine Router**: Seamless fallback between `token_bucket` and legacy `sliding_window` via `RATE_LIMIT_ALGORITHM`.
 
 ### ⏱️ Synchronized Dual Clocks & 24-Hour Working Overlap Matrix
 - Floating dual clock cards with digital time, UTC offset, timezone abbreviations, and live coordinates.
@@ -74,9 +92,9 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 - Real-time astronomical telemetry deck displaying Sun & Moon altitude, azimuth, solar noon, dawn/dusk twilight times, and exact coordinates.
 
 ### 🔑 Developer REST API & Sandbox (`/docs`)
-- Dedicated REST API (`/api/v1/*`) with standard JSON envelopes and HTTP status codes.
+- Dedicated REST API (`/api/v1/*`) with standard JSON envelopes, HTTP status codes, and universal CORS for cross-platform apps (Android, Windows, web).
 - Interactive in-browser API testing sandbox with real-time response previews and copyable code snippets (curl, JavaScript/TypeScript, Python).
-- Built-in rate limiting headers (`x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`).
+- Built-in rate limiting headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`).
 
 ### 📊 Real-Time Analytics Telemetry (`/dashboard` & `/admin`)
 - User-level telemetry on `/dashboard` (request volumes, average latencies, status distributions, endpoint breakdown).
@@ -85,7 +103,7 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 
 ### 🛡️ Enterprise-Grade Security
 - Cryptographic SHA-256 API key hashing (`to_live_...` prefix; plaintext keys are never persisted).
-- Rolling 60-second window rate limiting via MongoDB aggregation.
+- Token Bucket rate limiting and MongoDB rolling window logging.
 - Passwords hashed with `bcryptjs` (salt rounds: 12) and sessions secured via HTTP-only, SameSite JWT cookies.
 
 ---
@@ -96,16 +114,17 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 flowchart TD
     Client["Client Browser / API Consumer"]
 
-    subgraph Frontend["Next.js App Router (Frontend)"]
+    subgraph Frontend["Next.js App Router & Desktop Client"]
         UI_Home["Homepage (3D Globe & Clocks)"]
         UI_Compare["Compare Matrix & Scrubber"]
         UI_Docs["Interactive API Sandbox"]
         UI_Dash["Developer & Admin Dashboards"]
+        UI_Wallpaper["/wallpaper & Standalone Lively Desktop"]
     end
 
-    subgraph CoreEngine["In-House Local Domain Engine"]
+    subgraph CoreEngine["In-House Computational Domain"]
         TimeEngine["timeEngine.ts (Solar & Time Calculations)"]
-        CityData["cities.ts (48 Global Hubs)"]
+        CityData["cities.ts (70+ Global Hubs & GPS)"]
     end
 
     subgraph APIRoutes["Next.js Route Handlers (/api)"]
@@ -117,9 +136,10 @@ flowchart TD
         APIAdmin["/api/admin"]
     end
 
-    subgraph SecurityMiddleware["Security & Auth Middleware"]
+    subgraph SecurityMiddleware["Security & Traffic Shaping"]
         AuthModule["auth.ts (JWT Sign & Verify)"]
-        KeyModule["apiKey.ts (SHA-256 Hash & Rate Limiter)"]
+        KeyModule["apiKey.ts (SHA-256 Auth Guard)"]
+        TokenBucketEngine["tokenBucket.ts (O(1) Token Bucket Limiter)"]
     end
 
     subgraph DatabaseLayer["Persistence (MongoDB Atlas)"]
@@ -135,6 +155,7 @@ flowchart TD
     Client -->|External REST with API Key| APIRoutes
 
     APIRoutes --> SecurityMiddleware
+    SecurityMiddleware --> TokenBucketEngine
     SecurityMiddleware --> CoreEngine
     SecurityMiddleware --> MongooseConn
     MongooseConn --> DB_Users
@@ -153,10 +174,12 @@ flowchart TD
 | **Language** | [TypeScript 5](https://www.typescriptlang.org/) | Strict static typing across domain, models, and routes |
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) | Custom dark mode glassmorphic styling |
 | **3D Graphics** | [Three.js](https://threejs.org/) (r183) & WebGL | Custom celestial observatory engine with Earth textures, stars, Moon orbit, and flight arcs |
+| **Desktop Live Wallpaper** | Three.js + HTML5 WebGL | Standalone offline desktop live wallpaper for Lively Wallpaper / Wallpaper Engine |
+| **Rate Limiting Engine** | Custom Token Bucket Limiter | $O(1)$ continuous mathematical replenishment with burst handling & LRU eviction |
 | **Icons** | [Lucide React](https://lucide.dev/) | Clean, consistent SVG icon set |
 | **Database** | [MongoDB](https://www.mongodb.com/) via [Mongoose 8](https://mongoosejs.com/) | Document persistence with pooled connections |
 | **Security** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | JWT session verification & salted password hashing |
-| **Testing** | Node ESM / [Vitest](https://vitest.dev/) | 63 automated unit, integration, and scenario tests |
+| **Testing** | Node ESM / [Vitest](https://vitest.dev/) | **72 automated unit, integration, and scenario tests** |
 
 ---
 
@@ -408,6 +431,44 @@ Returns aggregated API usage statistics, latency benchmarks, and endpoint breakd
 
 ---
 
+### 5. Rate Limiting Engines (Token Bucket vs Sliding Window)
+
+TimeOrbit supports two rate-limiting architectures, configurable via the `RATE_LIMIT_ALGORITHM` environment variable:
+
+```ini
+# Choose rate limiting strategy: 'token_bucket' (default) or 'sliding_window'
+RATE_LIMIT_ALGORITHM=token_bucket
+```
+
+#### Engine A: Token Bucket (Recommended for High Throughput)
+* **Complexity**: $O(1)$ constant time execution in memory.
+* **Replenishment**: Continuous mathematical replenishment:
+  $$\text{tokens} = \min\left(C,\; \text{last\_tokens} + \Delta t \times \frac{L}{60}\right)$$
+* **Burst Handling**: Permits rapid spikes up to bucket capacity $C$ (or $C \times \text{burstMultiplier}$) while strictly enforcing average throughput.
+* **Response Headers**:
+  * `X-RateLimit-Limit`: Maximum tokens in bucket (e.g., `60`).
+  * `X-RateLimit-Remaining`: Current available token balance.
+  * `Retry-After: <seconds>`: Returned on HTTP 429 indicating seconds until enough tokens replenish for the next call.
+
+#### Engine B: Sliding Window Log (Audit & Strict Quota)
+* Counts requests recorded in MongoDB within a rolling 60-second window.
+* Ideal when audit logs must strictly dictate rate limits across distributed serverless functions without shared cache.
+
+---
+
+## 🪟 Windows Live Desktop Wallpaper
+
+TimeOrbit provides an offline, real-time 3D Earth desktop live wallpaper located in `wallpaper/`:
+
+* **Zero Network Latency**: Standalone procedural WebGL Three.js renderer bundled into a single offline file (`wallpaper/index.html`).
+* **Dual-City Dropdowns**: Click directly on the origin or target city name in the bottom dock to select from 25+ global hubs.
+* **Desktop-Clean Layout**: Free of top title headers, leaving screen space unobstructed for Windows desktop icons.
+* **Double-Click HUD Toggle**: Double-click anywhere on the desktop to completely hide all HUD elements for pure aesthetic globe mode.
+* **Lively Wallpaper Manifest (`LivelyProperties.json`)**: Configure rotation speed and second city directly from the Windows Lively settings dialog.
+* **Next.js Web Route (`/wallpaper`)**: Experience the exact same full-screen wallpaper mode directly in any web browser.
+
+---
+
 ## 🔑 Developer Dashboard & Key Management
 
 TimeOrbit provides a developer portal at `/dashboard` where authenticated users can:
@@ -428,11 +489,11 @@ npm test
 
 ### Test Architecture
 
-The test harness executes 63 deterministic tests across 4 coverage tiers without external database dependencies:
+The test harness executes **72 deterministic tests** across 5 test suites without external database dependencies:
 
 ```
 ================================================================
-GRAND TOTAL TEST SUMMARY: 63 PASSED, 0 FAILED
+GRAND TOTAL TEST SUMMARY: 72 PASSED, 0 FAILED
 ================================================================
 ```
 
@@ -440,6 +501,7 @@ GRAND TOTAL TEST SUMMARY: 63 PASSED, 0 FAILED
 |---|---|
 | **`timeEngine.test.mjs`** | UTC conversions, negative offsets, fractional offsets (`+05:30`), leap year (`2024-02-29`), midnight boundaries, solar elevations. |
 | **`apiKey.test.mjs`** | `to_live_` key generation, SHA-256 hashing, status checks (`pending`, `approved`, `revoked`), rolling 60s rate limit enforcement. |
+| **`tokenBucket.test.mjs`** | $O(1)$ token consumption, rapid burst capacity, continuous elapsed-time replenishment, burst multipliers, variable costs, tenant isolation, and stale key LRU eviction. |
 | **`endpoints.test.mjs`** | In-memory REST testing of `/api/v1/time`, `/api/v1/compare`, and `/api/v1/zones` with header validations. |
 | **`analytics_empirical_challenge.mjs`** | Dual-mode auth validation, role scoping (`me` vs `global`), range validation (`24h`, `7d`, `30d`), CORS preflights, zero-division resilience. |
 | **`adversarial_telemetry_stress.mjs`** | High-volume traffic simulation (100k requests), UI chart scaling, race-condition mitigation with `AbortController`. |
@@ -456,13 +518,19 @@ npm run lint
 ```
 TimeOrbit/
 ├── .env.example                     # Environment configuration template
+├── vercel.json                      # Universal CORS rules for cross-platform sharing
 ├── PROJECT.md                       # Engineering milestones & technical specifications
 ├── TEST_INFRA.md                    # Test infrastructure and scenario matrices
 ├── package.json                     # Project manifest and scripts
+├── wallpaper/                       # Standalone Windows desktop live wallpaper
+│   ├── index.html                   # Offline WebGL 3D Earth live wallpaper
+│   ├── LivelyProperties.json        # Windows Lively Wallpaper properties manifest
+│   └── README.md                    # Wallpaper setup guide
 ├── src/
 │   ├── app/
 │   │   ├── page.tsx                 # Homepage with 3D globe & live city clocks
 │   │   ├── compare/page.tsx         # Timezone comparison matrix & scrubber
+│   │   ├── wallpaper/page.tsx       # Dedicated clean web wallpaper route
 │   │   ├── docs/page.tsx            # Interactive REST API sandbox & docs
 │   │   ├── dashboard/page.tsx       # Developer key management & analytics
 │   │   ├── admin/page.tsx           # Admin key approval & global telemetry
@@ -485,13 +553,14 @@ TimeOrbit/
 │   │       └── Footer.tsx           # Global footer
 │   ├── lib/
 │   │   ├── timeEngine.ts            # Solar & timezone computational engine
-│   │   ├── cities.ts                # Catalog of 38 global cities and coordinates
-│   │   ├── apiKey.ts                # SHA-256 key generator, validator & rate limiter
+│   │   ├── cities.ts                # Catalog of 70+ global cities and GPS resolver
+│   │   ├── tokenBucket.ts           # O(1) Token Bucket rate limiting engine
+│   │   ├── apiKey.ts                # SHA-256 key generator, validator & rate limit router
 │   │   ├── auth.ts                  # JWT token signing & cookie verification
 │   │   └── mongodb.ts               # Mongoose connection & admin auto-seeding
 │   ├── models/
 │   │   ├── User.ts                  # User schema with roles ('user' | 'admin')
-│   │   ├── ApiKey.ts                # API key schema with hashed token
+│   │   ├── ApiKey.ts                # API key schema with hashed token & token bucket
 │   │   └── ApiLog.ts                # Request telemetry & rate limit window logs
 │   └── types/
 │       └── index.ts                 # Shared TypeScript interfaces
@@ -499,6 +568,7 @@ TimeOrbit/
 │   ├── run-all-tests.mjs            # Unified test harness
 │   ├── timeEngine.test.mjs          # Core domain logic tests
 │   ├── apiKey.test.mjs              # Security & rate limiting tests
+│   ├── tokenBucket.test.mjs         # Token Bucket burst & refill tests
 │   ├── endpoints.test.mjs           # Route handler integration tests
 │   ├── analytics_empirical_challenge.mjs
 │   └── adversarial_telemetry_stress.mjs

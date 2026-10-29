@@ -13,8 +13,15 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
 
+    const validStatuses = ['pending', 'approved', 'rejected', 'revoked'];
     const filter: Record<string, unknown> = {};
     if (status && status !== 'all') {
+      if (!validStatuses.includes(status)) {
+        return NextResponse.json(
+          { error: `Invalid status parameter. Allowed: ${validStatuses.join(', ')}, all` },
+          { status: 400 }
+        );
+      }
       filter.status = status;
     }
 

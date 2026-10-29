@@ -1,0 +1,46 @@
+{
+  "AppVersion": "1.0.0",
+  "Title": "TimeOrbit Celestial Live Wallpaper",
+  "Thumbnail": "thumbnail.jpg",
+  "Preview": "preview.gif",
+  "Desc": "Minimalist luxury real-time 3D Earth desktop live wallpaper with glowing night city lights, polar aurora, and dual-clock observatory.",
+  "Author": "TimeOrbit",
+  "License": "MIT",
+  "Contact": "https://timeorbit.vercel.app",
+  "Type": 1,
+  "FileName": "index.html",
+  "Arguments": null,
+  "IsAbsolutePath": false,
+  "Properties": {
+    "rotationSpeed": {
+      "type": "slider",
+      "value": 0.8,
+      "min": 0,
+      "max": 3,
+      "step": 0.1,
+      "text": "Earth Rotation Speed"
+    },
+    "showHUD": {
+      "type": "checkbox",
+      "value": true,
+      "text": "Show Minimal Observatory Clocks"
+    },
+    "secondCity": {
+      "type": "dropdown",
+      "value": 1,
+      "items": [
+        "New Delhi",
+        "London",
+        "Tokyo",
+        "New York",
+        "Paris",
+        "Dubai",
+        "Singapore",
+        "Sydney",
+        "San Francisco",
+        "Zurich"
+      ],
+      "text": "Compare With (Second City)"
+    }
+  }
+}

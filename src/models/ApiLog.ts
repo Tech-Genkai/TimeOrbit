@@ -53,5 +53,9 @@ const ApiLogSchema = new Schema<IApiLogDocument>(
   }
 );
 
+// High-performance compound indexes for rolling window rate limiting & telemetry queries
+ApiLogSchema.index({ apiKeyId: 1, createdAt: -1 });
+ApiLogSchema.index({ userId: 1, createdAt: -1 });
+
 export const ApiLog: Model<IApiLogDocument> =
   mongoose.models.ApiLog || mongoose.model<IApiLogDocument>('ApiLog', ApiLogSchema);

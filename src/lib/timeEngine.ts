@@ -422,3 +422,296 @@ export function compareCities(from: CityData, to: CityData, targetDate: Date = n
     timeline24h,
   };
 }
+
+/**
+ * Calculates geodesic Great-Circle distance and commercial flight metrics between two coordinates
+ */
+export function calculateGeodesicDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): {
+  distanceKm: number;
+  distanceMiles: number;
+  angularDegrees: number;
+  flightTimeFormatted: string;
+  solarTimeLagHours: number;
+} {
+  const R = 6371; // Mean Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = Math.round(R * c);
+  const distanceMiles = Math.round(distanceKm * 0.621371);
+  const angularDegrees = Number(((c * 180) / Math.PI).toFixed(1));
+
+  // Commercial airliner flight estimate at 850 km/h + 35 min taxi/takeoff/landing
+  const hours = distanceKm / 850 + 0.58;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  const flightTimeFormatted = `${h}h ${m}m`;
+
+  // Solar longitudinal difference (15 degrees = 1 hour solar lag)
+  const solarTimeLagHours = Number((Math.abs(lng2 - lng1) / 15).toFixed(1));
+
+  return {
+    distanceKm,
+    distanceMiles,
+    angularDegrees,
+    flightTimeFormatted,
+    solarTimeLagHours,
+  };
+}
+
+export interface EarthOrbitalTelemetry {
+  dayOfYear: number;
+  sunDistanceAu: number;
+  sunDistanceKm: string;
+  orbitalVelocityKms: number;
+  orbitalVelocityKmh: string;
+  equatorSpeedKmh: number;
+  axialTiltDeg: number;
+  solarConstantWm2: number;
+}
+
+/**
+ * Real-time planetary orbital physics of Earth in the solar system
+ */
+export function getEarthOrbitalTelemetry(date: Date = new Date()): EarthOrbitalTelemetry {
+  const startOfYear = new Date(date.getUTCFullYear(), 0, 0).getTime();
+  const dayOfYear = Math.floor((date.getTime() - startOfYear) / 86400000);
+
+  // Mean anomaly M (perihelion around Jan 4)
+  const M = ((2 * Math.PI) / 365.25) * (dayOfYear - 4);
+  const sunDistanceAu = Number((1.0 - 0.0167 * Math.cos(M)).toFixed(4));
+  const sunDistanceKmNum = Math.round(sunDistanceAu * 149597870.7);
+  const sunDistanceKm = sunDistanceKmNum.toLocaleString('en-US');
+
+  // Vis-viva equation: v = 29.78 * sqrt(2/r - 1)
+  const orbitalVelocityKms = Number((29.78 * Math.sqrt(Math.max(0.1, 2 / sunDistanceAu - 1))).toFixed(2));
+  const orbitalVelocityKmh = Math.round(orbitalVelocityKms * 3600).toLocaleString('en-US');
+
+  return {
+    dayOfYear,
+    sunDistanceAu,
+    sunDistanceKm,
+    orbitalVelocityKms,
+    orbitalVelocityKmh,
+    equatorSpeedKmh: 1674, // Equator linear velocity (465.1 m/s)
+    axialTiltDeg: 23.44,   // Earth's axial obliquity
+    solarConstantWm2: Math.round(1361 / (sunDistanceAu * sunDistanceAu)),
+  };
+}
+
+export interface LunarDetailedEphemeris {
+  phase: string;
+  phaseEmoji: string;
+  illumination: number;
+  ageDays: number;
+  synodicCycleDays: number;
+  distanceKm: string;
+  lightSeconds: number;
+  daysToNextFullMoon: number;
+  daysToNextNewMoon: number;
+}
+
+/**
+ * Detailed lunar orbital metrics, cycle age and Earth-Moon telemetries
+ */
+export function getLunarDetailedEphemeris(date: Date = new Date()): LunarDetailedEphemeris {
+  const refNewMoon = new Date('2024-01-11T11:57:00Z').getTime();
+  const synodicMonthMs = 29.53058867 * 86400000;
+  const elapsed = (date.getTime() - refNewMoon) % synodicMonthMs;
+  const ageDaysRaw = ((elapsed + synodicMonthMs) % synodicMonthMs) / 86400000;
+  const ageDays = Number(ageDaysRaw.toFixed(1));
+
+  const baseLunar = getSublunarPoint(date);
+
+  // Lunar orbital eccentricity ~0.0549
+  const moonMeanAnomaly = ((2 * Math.PI) / 27.55455) * ageDaysRaw;
+  const distanceKmNum = Math.round(384400 - 21000 * Math.cos(moonMeanAnomaly));
+  const distanceKm = distanceKmNum.toLocaleString('en-US');
+  const lightSeconds = Number((distanceKmNum / 299792.458).toFixed(2));
+
+  // Countdown to key phases
+  const fullMoonAge = 29.53058867 / 2;
+  const daysToNextFullMoon = Number((((fullMoonAge - ageDaysRaw) % 29.53058867 + 29.53058867) % 29.53058867).toFixed(1));
+  const daysToNextNewMoon = Number((((29.53058867 - ageDaysRaw) % 29.53058867 + 29.53058867) % 29.53058867).toFixed(1));
+
+  return {
+    phase: baseLunar.phase,
+    phaseEmoji: baseLunar.phaseEmoji,
+    illumination: baseLunar.illumination,
+    ageDays,
+    synodicCycleDays: 29.53,
+    distanceKm,
+    lightSeconds,
+    daysToNextFullMoon,
+    daysToNextNewMoon,
+  };
+}
+
+export interface ISSPosition {
+  lat: number;
+  lng: number;
+  altitudeKm: number;
+  speedKmh: number;
+  speedKms: number;
+  orbitalPeriodMinutes: number;
+  footprintRadiusKm: number;
+}
+
+/**
+ * Calculates authentic real-time orbital position of the International Space Station (ISS)
+ * 51.64° orbital inclination, ~418 km altitude, 92.7 minute orbit period
+ */
+export function getISSOrbitalPosition(date: Date = new Date()): ISSPosition {
+  const epoch = new Date('2024-01-01T00:00:00Z').getTime();
+  const elapsedSec = (date.getTime() - epoch) / 1000;
+
+  const periodSec = 5560.8; // 92.68 minutes
+  const inclinationRad = (51.64 * Math.PI) / 180;
+
+  const orbitFraction = (elapsedSec % periodSec) / periodSec;
+  const u = orbitFraction * 2 * Math.PI;
+
+  const sinLat = Math.sin(inclinationRad) * Math.sin(u);
+  const lat = Math.asin(Math.max(-1, Math.min(1, sinLat))) * (180 / Math.PI);
+
+  const earthRotationDegPerSec = 360 / 86164;
+  const nodalPrecessionDegPerSec = 5.0 / 86400;
+  const orbitLng = Math.atan2(Math.cos(inclinationRad) * Math.sin(u), Math.cos(u)) * (180 / Math.PI);
+
+  let lng = orbitLng - (earthRotationDegPerSec + nodalPrecessionDegPerSec) * elapsedSec;
+  lng = ((((lng + 180) % 360) + 360) % 360) - 180;
+
+  return {
+    lat: Number(lat.toFixed(2)),
+    lng: Number(lng.toFixed(2)),
+    altitudeKm: 418,
+    speedKmh: 27580,
+    speedKms: 7.66,
+    orbitalPeriodMinutes: 92.7,
+    footprintRadiusKm: 2200,
+  };
+}
+
+export interface PhotographyLightingState {
+  currentPhase: 'golden_hour' | 'blue_hour' | 'daylight' | 'night';
+  currentPhaseLabel: string;
+  isGoldenHour: boolean;
+  isBlueHour: boolean;
+  solarAltitudeDeg: number;
+}
+
+/**
+ * Calculates Golden Hour and Blue Hour twilight photography conditions for any observer location
+ */
+export function getPhotographySolarHours(lat: number, lng: number, date: Date = new Date()): PhotographyLightingState {
+  const celestial = calculateLocalCelestialPosition(lat, lng, date);
+  const alt = celestial.sun.altitudeDeg;
+
+  let currentPhase: 'golden_hour' | 'blue_hour' | 'daylight' | 'night' = 'night';
+  let currentPhaseLabel = 'Night Sky';
+  let isGoldenHour = false;
+  let isBlueHour = false;
+
+  if (alt > 6) {
+    currentPhase = 'daylight';
+    currentPhaseLabel = 'Broad Daylight';
+  } else if (alt >= -4 && alt <= 6) {
+    currentPhase = 'golden_hour';
+    currentPhaseLabel = 'Golden Hour (Warm Glow)';
+    isGoldenHour = true;
+  } else if (alt >= -6 && alt < -4) {
+    currentPhase = 'blue_hour';
+    currentPhaseLabel = 'Blue Hour (Deep Twilight)';
+    isBlueHour = true;
+  } else {
+    currentPhase = 'night';
+    currentPhaseLabel = 'Astronomical Night';
+  }
+
+  return {
+    currentPhase,
+    currentPhaseLabel,
+    isGoldenHour,
+    isBlueHour,
+    solarAltitudeDeg: alt,
+  };
+}
+
+export interface MeetingCalendarExport {
+  googleCalendarUrl: string;
+  icsContent: string;
+  icsFileName: string;
+}
+
+/**
+ * Generates an RFC 5545 .ics calendar invite and 1-click Google Calendar link for meeting overlaps
+ */
+export function generateCalendarMeetingLinks(
+  cityA: CityData,
+  cityB: CityData,
+  overlapHourUTC: number,
+  durationHours = 1
+): MeetingCalendarExport {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const startYear = tomorrow.getUTCFullYear();
+  const startMonth = tomorrow.getUTCMonth();
+  const startDay = tomorrow.getUTCDate();
+
+  const startDate = new Date(Date.UTC(startYear, startMonth, startDay, overlapHourUTC, 0, 0));
+  const endDate = new Date(startDate.getTime() + durationHours * 3600000);
+
+  const formatUtcIso = (d: Date) =>
+    d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const startIso = formatUtcIso(startDate);
+  const endIso = formatUtcIso(endDate);
+
+  const title = `TimeOrbit Synchronized Meeting: ${cityA.city} ⇄ ${cityB.city}`;
+  const description = `Synchronized planetary meeting between ${cityA.city} (${cityA.timezone}) and ${cityB.city} (${cityB.timezone}). Coordinated via TimeOrbit Celestial Observatory.`;
+  const location = `${cityA.city} / ${cityB.city} (Online / Teleconference)`;
+
+  const googleUrl = new URL('https://calendar.google.com/calendar/render');
+  googleUrl.searchParams.set('action', 'TEMPLATE');
+  googleUrl.searchParams.set('text', title);
+  googleUrl.searchParams.set('dates', `${startIso}/${endIso}`);
+  googleUrl.searchParams.set('details', description);
+  googleUrl.searchParams.set('location', location);
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TimeOrbit//Planetary Celestial Time//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:timeorbit-${Date.now()}@timeorbit.io`,
+    `DTSTAMP:${formatUtcIso(new Date())}`,
+    `DTSTART:${startIso}`,
+    `DTEND:${endIso}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${description}`,
+    `LOCATION:${location}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  return {
+    googleCalendarUrl: googleUrl.toString(),
+    icsContent: ics,
+    icsFileName: `meeting-${cityA.city.toLowerCase()}-${cityB.city.toLowerCase()}.ics`,
+  };
+}

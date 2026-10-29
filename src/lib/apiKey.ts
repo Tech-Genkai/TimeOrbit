@@ -102,15 +102,26 @@ export interface RateLimitResult {
   resetInSeconds: number;
 }
 
-export async function checkRateLimit(
+export {
+  tokenBucketLimiter,
+  checkTokenBucketRateLimit,
+  TokenBucketLimiter,
+} from './tokenBucket';
+
+export async function checkSlidingWindowRateLimit(
   keyId: string | mongoose.Types.ObjectId,
   limitPerMinute: number = 60
 ): Promise<RateLimitResult> {
   await connectToDatabase();
   const windowStart = new Date(Date.now() - 60 * 1000);
 
+  const safeKeyId =
+    typeof keyId === 'string' && mongoose.Types.ObjectId.isValid(keyId)
+      ? new mongoose.Types.ObjectId(keyId)
+      : keyId;
+
   const requestCount = await ApiLog.countDocuments({
-    apiKeyId: keyId,
+    apiKeyId: safeKeyId,
     createdAt: { $gte: windowStart },
   });
 
@@ -122,4 +133,25 @@ export async function checkRateLimit(
     remaining,
     resetInSeconds: 60,
   };
+}
+
+export async function checkRateLimit(
+  keyId: string | mongoose.Types.ObjectId,
+  limitPerMinute: number = 60,
+  options?: {
+    algorithm?: 'token_bucket' | 'sliding_window';
+    cost?: number;
+    burstMultiplier?: number;
+  }
+): Promise<RateLimitResult> {
+  const algo = options?.algorithm || process.env.RATE_LIMIT_ALGORITHM || 'sliding_window';
+  if (algo === 'token_bucket') {
+    const { checkTokenBucketRateLimit } = await import('./tokenBucket');
+    return checkTokenBucketRateLimit(keyId, limitPerMinute, {
+      cost: options?.cost,
+      burstMultiplier: options?.burstMultiplier,
+    });
+  }
+
+  return checkSlidingWindowRateLimit(keyId, limitPerMinute);
 }

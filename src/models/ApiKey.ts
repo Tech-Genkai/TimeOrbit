@@ -10,6 +10,9 @@ export interface IApiKeyDocument extends Document {
   lastFour: string;
   status: ApiKeyStatus;
   rateLimit: number;
+  burstCapacity?: number;
+  bucketTokens?: number;
+  bucketLastRefill?: Date;
   rejectionReason?: string;
   approvedAt?: Date;
   approvedBy?: mongoose.Types.ObjectId;
@@ -60,6 +63,15 @@ const ApiKeySchema = new Schema<IApiKeyDocument>(
       type: Number,
       default: 60,
     },
+    burstCapacity: {
+      type: Number,
+    },
+    bucketTokens: {
+      type: Number,
+    },
+    bucketLastRefill: {
+      type: Date,
+    },
     rejectionReason: {
       type: String,
       default: '',
@@ -79,6 +91,10 @@ const ApiKeySchema = new Schema<IApiKeyDocument>(
     timestamps: true,
   }
 );
+
+// High-performance compound indexes for user listings and admin queries
+ApiKeySchema.index({ userId: 1, createdAt: -1 });
+ApiKeySchema.index({ status: 1, createdAt: -1 });
 
 export const ApiKey: Model<IApiKeyDocument> =
   mongoose.models.ApiKey || mongoose.model<IApiKeyDocument>('ApiKey', ApiKeySchema);

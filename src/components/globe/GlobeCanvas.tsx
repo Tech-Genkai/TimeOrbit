@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { CITIES } from '@/lib/cities';
-import { getSubsolarPoint, getSublunarPoint } from '@/lib/timeEngine';
+import { getSubsolarPoint, getSublunarPoint, getISSOrbitalPosition, ISSPosition } from '@/lib/timeEngine';
 
 export interface GlobeCanvasHandle {
   zoomIn: () => void;
@@ -21,8 +21,8 @@ interface GlobeCanvasProps {
   primaryLocation?: GlobeLocation;
   secondaryLocation?: GlobeLocation;
   autoRotate?: boolean;
-  focusedTarget?: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth';
-  onFocusChange?: (target: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth') => void;
+  focusedTarget?: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth' | 'iss';
+  onFocusChange?: (target: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth' | 'iss') => void;
   className?: string;
 }
 
@@ -293,6 +293,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     illumination: number;
     phaseEmoji: string;
   } | null>(null);
+  const [issState, setIssState] = useState<ISSPosition | null>(null);
 
   // Three.js scene refs
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -301,7 +302,12 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
   const cloudMeshRef = useRef<THREE.Mesh | null>(null);
   const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
   const sunMeshRef = useRef<THREE.Group | null>(null);
+  const sunZenithMarkerRef = useRef<THREE.Group | null>(null);
   const moonMeshRef = useRef<THREE.Group | null>(null);
+  const issMeshRef = useRef<THREE.Group | null>(null);
+  const issOrbitLineRef = useRef<THREE.Line | null>(null);
+  const auroraNorthRef = useRef<THREE.Mesh | null>(null);
+  const auroraSouthRef = useRef<THREE.Mesh | null>(null);
   const primaryPinRef = useRef<THREE.Group | null>(null);
   const secondaryPinRef = useRef<THREE.Group | null>(null);
   const flightArcRef = useRef<THREE.Line | null>(null);
@@ -313,8 +319,8 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
   const currentLngRef = useRef<number>(primaryLocation.lng);
 
   // Camera Zoom Distance (min: 3.2, max: 8.5)
-  const targetDistRef = useRef<number>(5.2);
-  const currentDistRef = useRef<number>(5.2);
+  const targetDistRef = useRef<number>(5.8);
+  const currentDistRef = useRef<number>(5.8);
 
   // Expose Zoom and Reset APIs to parent page
   useImperativeHandle(ref, () => ({
@@ -325,7 +331,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       targetDistRef.current = Math.min(8.5, targetDistRef.current + 0.7);
     },
     resetZoom: () => {
-      targetDistRef.current = 5.2;
+      targetDistRef.current = 5.8;
     },
   }));
 
@@ -335,7 +341,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
   const prevPointerY = useRef<number>(0);
 
   // Shortest-path angle normalization to smoothly pivot camera without wild multi-turn spinning
-  const focusOnCoordinates = useCallback((lat: number, lng: number, distance = 5.2) => {
+  const focusOnCoordinates = useCallback((lat: number, lng: number, distance = 5.8) => {
     targetLatRef.current = Math.max(-75, Math.min(75, lat));
     targetDistRef.current = distance;
 
@@ -369,22 +375,25 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
 
     if (targetChanged || (focusedTarget === 'primary' && cityAChanged)) {
       if (focusedTarget === 'primary') {
-        focusOnCoordinates(primaryLocation.lat, primaryLocation.lng, 4.4);
+        focusOnCoordinates(primaryLocation.lat, primaryLocation.lng, 4.8);
       }
     }
     if (targetChanged || (focusedTarget === 'secondary' && cityBChanged)) {
       if (focusedTarget === 'secondary') {
-        focusOnCoordinates(secondaryLocation.lat, secondaryLocation.lng, 4.4);
+        focusOnCoordinates(secondaryLocation.lat, secondaryLocation.lng, 4.8);
       }
     }
     if (targetChanged && focusedTarget === 'sun' && sunCoords) {
-      focusOnCoordinates(sunCoords.lat, sunCoords.lng, 4.8);
+      focusOnCoordinates(sunCoords.lat, sunCoords.lng, 5.2);
     }
     if (targetChanged && focusedTarget === 'moon' && moonState) {
-      focusOnCoordinates(moonState.lat, moonState.lng, 4.8);
+      focusOnCoordinates(moonState.lat, moonState.lng, 5.2);
+    }
+    if (targetChanged && focusedTarget === 'iss' && issState) {
+      focusOnCoordinates(issState.lat, issState.lng, 4.4);
     }
     if (targetChanged && focusedTarget === 'earth') {
-      targetDistRef.current = 5.2;
+      targetDistRef.current = 5.8;
     }
   }, [
     focusedTarget,
@@ -394,6 +403,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     secondaryLocation.lng,
     sunCoords,
     moonState,
+    issState,
     focusOnCoordinates,
   ]);
 
@@ -404,12 +414,15 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
 
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
+    // Elevate Earth slightly in the viewport so it never collides with the bottom floating dock
+    const vOffset = Math.round(height * 0.12);
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 0, 5.2);
+    camera.setViewOffset(width, height, 0, vOffset, width, height);
+    camera.position.set(0, 0, 5.8);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -508,6 +521,132 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     orbitLine.computeLineDistances();
     scene.add(orbitLine);
 
+    // --- Earth Polar Rotational Axis & Pole Indicators ---
+    const axisPoints = [
+      new THREE.Vector3(0, -earthRadius * 1.32, 0),
+      new THREE.Vector3(0, earthRadius * 1.32, 0),
+    ];
+    const axisGeo = new THREE.BufferGeometry().setFromPoints(axisPoints);
+    const axisMat = new THREE.LineDashedMaterial({
+      color: 0x8cbaff,
+      dashSize: 0.08,
+      gapSize: 0.06,
+      transparent: true,
+      opacity: 0.4,
+    });
+    const polarAxis = new THREE.Line(axisGeo, axisMat);
+    polarAxis.computeLineDistances();
+    scene.add(polarAxis);
+
+    const northPoleSprite = createMarkerSprite('N. POLE', '#8cbaff', 'rgba(0, 0, 0, 0.75)');
+    northPoleSprite.position.set(0, earthRadius * 1.38, 0);
+    northPoleSprite.scale.set(0.38, 0.10, 1);
+    scene.add(northPoleSprite);
+
+    const southPoleSprite = createMarkerSprite('S. POLE', '#8cbaff', 'rgba(0, 0, 0, 0.75)');
+    southPoleSprite.position.set(0, -earthRadius * 1.38, 0);
+    southPoleSprite.scale.set(0.38, 0.10, 1);
+    scene.add(southPoleSprite);
+
+    // --- Aurora Borealis (North Polar Shimmering Glow Ring at +71° N) ---
+    const auroraNorthGeo = new THREE.TorusGeometry(0.47, 0.04, 16, 64);
+    const auroraNorthMat = new THREE.MeshBasicMaterial({
+      color: 0x22c55e,
+      transparent: true,
+      opacity: 0.42,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const auroraNorth = new THREE.Mesh(auroraNorthGeo, auroraNorthMat);
+    auroraNorth.position.set(0, earthRadius * Math.sin((71 * Math.PI) / 180), 0);
+    auroraNorth.rotation.x = Math.PI / 2;
+    scene.add(auroraNorth);
+    auroraNorthRef.current = auroraNorth;
+
+    // --- Aurora Australis (South Polar Shimmering Glow Ring at -71° S) ---
+    const auroraSouthGeo = new THREE.TorusGeometry(0.47, 0.04, 16, 64);
+    const auroraSouthMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4,
+      transparent: true,
+      opacity: 0.38,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const auroraSouth = new THREE.Mesh(auroraSouthGeo, auroraSouthMat);
+    auroraSouth.position.set(0, -earthRadius * Math.sin((71 * Math.PI) / 180), 0);
+    auroraSouth.rotation.x = Math.PI / 2;
+    scene.add(auroraSouth);
+    auroraSouthRef.current = auroraSouth;
+
+    // --- Real-Time 3D International Space Station (ISS) Model ---
+    const issGroup = new THREE.Group();
+    const issCoreMat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      metalness: 0.85,
+      roughness: 0.3,
+    });
+    const issCore = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.09, 16), issCoreMat);
+    issCore.rotation.z = Math.PI / 2;
+    issGroup.add(issCore);
+
+    const issTrussMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.9,
+      roughness: 0.4,
+    });
+    const issTruss = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.22, 12), issTrussMat);
+    issGroup.add(issTruss);
+
+    const solarMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      roughness: 0.2,
+      metalness: 0.6,
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.3,
+    });
+    const solarGeo = new THREE.BoxGeometry(0.045, 0.08, 0.003);
+
+    const panel1 = new THREE.Mesh(solarGeo, solarMat);
+    panel1.position.set(0, 0.075, 0);
+    issGroup.add(panel1);
+
+    const panel2 = new THREE.Mesh(solarGeo, solarMat);
+    panel2.position.set(0, -0.075, 0);
+    issGroup.add(panel2);
+
+    const issSprite = createMarkerSprite('🛰️ ISS (418 km)', '#38bdf8', 'rgba(0, 0, 0, 0.85)');
+    issSprite.position.set(0, 0.14, 0);
+    issSprite.scale.set(0.55, 0.14, 1);
+    issGroup.add(issSprite);
+
+    scene.add(issGroup);
+    issMeshRef.current = issGroup;
+
+    // --- ISS Inclined Orbital Ring (51.64° orbital inclination) ---
+    const issRadius = earthRadius * (1 + 418 / 6371);
+    const issOrbitPoints: THREE.Vector3[] = [];
+    const issSegments = 96;
+    const incRad = (51.64 * Math.PI) / 180;
+    for (let i = 0; i <= issSegments; i++) {
+      const theta = (i / issSegments) * Math.PI * 2;
+      const x = issRadius * Math.cos(theta);
+      const y = issRadius * Math.sin(theta) * Math.sin(incRad);
+      const z = issRadius * Math.sin(theta) * Math.cos(incRad);
+      issOrbitPoints.push(new THREE.Vector3(x, y, z));
+    }
+    const issOrbitGeo = new THREE.BufferGeometry().setFromPoints(issOrbitPoints);
+    const issOrbitMat = new THREE.LineDashedMaterial({
+      color: 0x38bdf8,
+      dashSize: 0.08,
+      gapSize: 0.05,
+      transparent: true,
+      opacity: 0.35,
+    });
+    const issOrbitLine = new THREE.Line(issOrbitGeo, issOrbitMat);
+    issOrbitLine.computeLineDistances();
+    scene.add(issOrbitLine);
+    issOrbitLineRef.current = issOrbitLine;
+
     // --- Geodesic Flight Arc connecting Location A & Location B ---
     const flightArcMat = new THREE.LineDashedMaterial({
       color: 0xfea082,
@@ -520,16 +659,29 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     scene.add(flightArc);
     flightArcRef.current = flightArc;
 
-    // --- 3D Sun in Space ---
+    // --- Distant 3D Sun in Deep Cosmic Space (True Astronomical Perspective) ---
     const sunGroup = new THREE.Group();
     const sunCore = new THREE.Mesh(
-      new THREE.SphereGeometry(0.25, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0xfff7ed })
+      new THREE.SphereGeometry(1.6, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfffdf5 })
     );
     sunGroup.add(sunCore);
 
+    // Radiant Solar Photosphere
+    const sunPhotosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(2.2, 32, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffe4a0,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.BackSide,
+      })
+    );
+    sunGroup.add(sunPhotosphere);
+
+    // Dynamic Corona
     const corona = new THREE.Mesh(
-      new THREE.SphereGeometry(0.40, 24, 24),
+      new THREE.SphereGeometry(3.6, 24, 24),
       new THREE.MeshBasicMaterial({
         color: 0xf39041,
         transparent: true,
@@ -539,12 +691,58 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     );
     sunGroup.add(corona);
 
-    const sunSprite = createMarkerSprite('☀️ SUN', '#fea082', 'rgba(0, 0, 0, 0.85)');
-    sunSprite.position.set(0, 0.48, 0);
+    // Outer Solar Flare Radiance
+    const flare = new THREE.Mesh(
+      new THREE.SphereGeometry(6.2, 24, 24),
+      new THREE.MeshBasicMaterial({
+        color: 0xff8a00,
+        transparent: true,
+        opacity: 0.18,
+        side: THREE.BackSide,
+      })
+    );
+    sunGroup.add(flare);
+
+    const sunSprite = createMarkerSprite('☀️ SUN (1.0 AU)', '#fea082', 'rgba(0, 0, 0, 0.85)');
+    sunSprite.position.set(0, 3.2, 0);
+    sunSprite.scale.set(1.6, 0.4, 1);
     sunGroup.add(sunSprite);
 
     scene.add(sunGroup);
     sunMeshRef.current = sunGroup;
+
+    // --- Solar Zenith Surface Beacon (Subsolar Point: Where Sun is at 90° Overhead) ---
+    const zenithGroup = new THREE.Group();
+    const zenithCore = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
+    );
+    zenithGroup.add(zenithCore);
+
+    const ringGeo1 = new THREE.RingGeometry(0.065, 0.085, 24);
+    const ringMat1 = new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
+    const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
+    ring1.rotation.x = Math.PI / 2;
+    zenithGroup.add(ring1);
+
+    const ringGeo2 = new THREE.RingGeometry(0.11, 0.13, 24);
+    const ringMat2 = new THREE.MeshBasicMaterial({
+      color: 0xfde68a,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
+    });
+    const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
+    ring2.rotation.x = Math.PI / 2;
+    zenithGroup.add(ring2);
+
+    const zenithSprite = createMarkerSprite('☀️ SOLAR NOON', '#f59e0b', 'rgba(0, 0, 0, 0.85)');
+    zenithSprite.position.set(0, 0.18, 0);
+    zenithSprite.scale.set(0.55, 0.14, 1);
+    zenithGroup.add(zenithSprite);
+
+    scene.add(zenithGroup);
+    sunZenithMarkerRef.current = zenithGroup;
 
     // --- 3D Moon in Space ---
     const moonGroup = new THREE.Group();
@@ -624,6 +822,17 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
         cloudMeshRef.current.rotation.y += 0.0004;
       }
 
+      // Shimmering breathing glow for Aurora polar rings
+      const timeSec = Date.now() * 0.0018;
+      if (auroraNorthRef.current) {
+        (auroraNorthRef.current.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.14 * Math.sin(timeSec);
+        auroraNorthRef.current.rotation.z += 0.0008;
+      }
+      if (auroraSouthRef.current) {
+        (auroraSouthRef.current.material as THREE.MeshBasicMaterial).opacity = 0.32 + 0.12 * Math.cos(timeSec);
+        auroraSouthRef.current.rotation.z -= 0.0008;
+      }
+
       const camPos = latLngToVector3(
         currentLatRef.current,
         currentLngRef.current,
@@ -640,7 +849,9 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       if (!container || !rendererRef.current || !cameraRef.current) return;
       const w = container.clientWidth;
       const h = container.clientHeight;
+      const vOffset = Math.round(h * 0.12);
       cameraRef.current.aspect = w / h;
+      cameraRef.current.setViewOffset(w, h, 0, vOffset, w, h);
       cameraRef.current.updateProjectionMatrix();
       rendererRef.current.setSize(w, h);
     };
@@ -673,21 +884,47 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
 
       const earthRadius = 1.45;
 
-      // Position Directional Sun Light
+      // Position Directional Sun Light far in deep space (True Astronomical Parallel Rays)
       const sunVec = latLngToVector3(sun.lat, sun.lng, 1);
+      const sunCosmicDistance = 42;
       if (sunLightRef.current) {
-        sunLightRef.current.position.set(sunVec.x * 20, sunVec.y * 20, sunVec.z * 20);
+        sunLightRef.current.position.set(
+          sunVec.x * sunCosmicDistance,
+          sunVec.y * sunCosmicDistance,
+          sunVec.z * sunCosmicDistance
+        );
       }
 
-      // Position 3D Sun Orb in space
+      // Position Distant 3D Sun in Deep Cosmic Space (42 units away in cosmic void)
       if (sunMeshRef.current) {
-        sunMeshRef.current.position.set(sunVec.x * 2.7, sunVec.y * 2.7, sunVec.z * 2.7);
+        sunMeshRef.current.position.set(
+          sunVec.x * sunCosmicDistance,
+          sunVec.y * sunCosmicDistance,
+          sunVec.z * sunCosmicDistance
+        );
+      }
+
+      // Position Solar Zenith Surface Beacon on Earth (Exact True Solar Noon point)
+      if (sunZenithMarkerRef.current) {
+        const zVec = latLngToVector3(sun.lat, sun.lng, earthRadius * 1.012);
+        sunZenithMarkerRef.current.position.copy(zVec);
+        sunZenithMarkerRef.current.lookAt(zVec.clone().multiplyScalar(2));
       }
 
       // Position 3D Moon Orb in space
       const moonVec = latLngToVector3(moon.lat, moon.lng, 1);
       if (moonMeshRef.current) {
         moonMeshRef.current.position.set(moonVec.x * 2.35, moonVec.y * 2.35, moonVec.z * 2.35);
+      }
+
+      // Position Real-Time 3D ISS in orbit
+      const iss = getISSOrbitalPosition(now);
+      setIssState(iss);
+      if (issMeshRef.current) {
+        const issAltitudeRadius = earthRadius * (1 + iss.altitudeKm / 6371);
+        const issVec = latLngToVector3(iss.lat, iss.lng, issAltitudeRadius);
+        issMeshRef.current.position.copy(issVec);
+        issMeshRef.current.lookAt(issVec.clone().multiplyScalar(2));
       }
 
       // Position Primary and Secondary City Pins

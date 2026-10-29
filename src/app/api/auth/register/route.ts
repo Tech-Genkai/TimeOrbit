@@ -14,21 +14,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return NextResponse.json({ error: 'Invalid input types' }, { status: 400 });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return NextResponse.json({ error: 'Invalid email address format' }, { status: 400 });
+    }
+
+    if (password.length < 6 || password.length > 128) {
+      return NextResponse.json(
+        { error: 'Password must be between 6 and 128 characters' },
+        { status: 400 }
+      );
     }
 
     await connectToDatabase();
 
-    const normalizedEmail = email.trim().toLowerCase();
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const sanitizedName = name && typeof name === 'string' && name.trim()
+      ? name.trim().slice(0, 80)
+      : normalizedEmail.split('@')[0];
+
     const user = await User.create({
-      name: name?.trim() || normalizedEmail.split('@')[0],
+      name: sanitizedName,
       email: normalizedEmail,
       passwordHash,
       role: 'user',

@@ -1,5 +1,6 @@
 import { runTimeEngineTests } from './timeEngine.test.mjs';
 import { runApiKeyTests } from './apiKey.test.mjs';
+import { runTokenBucketTests } from './tokenBucket.test.mjs';
 import { runEndpointsTests } from './endpoints.test.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -22,7 +23,12 @@ async function main() {
   totalPassed += t2.passed;
   totalFailed += t2.failed;
 
-  // 3. REST API Endpoints
+  // 3. Token Bucket Algorithm Suite
+  const tToken = await runTokenBucketTests();
+  totalPassed += tToken.passed;
+  totalFailed += tToken.failed;
+
+  // 4. REST API Endpoints
   const t3 = await runEndpointsTests();
   totalPassed += t3.passed;
   totalFailed += t3.failed;

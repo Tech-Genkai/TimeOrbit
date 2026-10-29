@@ -21,18 +21,22 @@
 | F9 | `GET /api/v1/compare` | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ | ✓ |
 | F10 | `GET /api/v1/zones` | ORIGINAL_REQUEST §R3 | 5 | 5 | ✓ | ✓ |
 | F11 | `GET /api/analytics` | ORIGINAL_REQUEST §R2 | 5 | 5 | ✓ | ✓ |
+| F12 | `tokenBucket.TokenBucketLimiter` | Architecture §R4 | 5 | 5 | ✓ | ✓ |
 
 ---
 
 ## Test Architecture
-- **Test Runner**: Vitest (`vitest run`), configured in `vitest.config.ts`.
+- **Test Runner**: Node ESM Test Runner with Web API loader (`tests/test-loader.mjs`).
 - **Environment**: Node environment with Web API globals (`Request`, `Response`, `Headers`, `crypto`, `Intl`).
 - **Path Aliases**: `@/*` mapped to `src/*`.
-- **Mocking**: Model mocks for `ApiKey` and `ApiLog` via Vitest `vi.mock()`.
-- **Location**: All tests located under `tests/`:
-  - `tests/timeEngine.test.ts`
-  - `tests/apiKey.test.ts`
-  - `tests/endpoints.test.ts`
+- **Mocking**: In-memory database mocks for `ApiKey` and `ApiLog`.
+- **Location**: All test suites located under `tests/`:
+  - `tests/timeEngine.test.mjs` (Core domain solar & timezone calculations)
+  - `tests/apiKey.test.mjs` (Cryptographic key generation, hashing & rate limiting)
+  - `tests/tokenBucket.test.mjs` (Token Bucket burst, continuous replenishment, eviction)
+  - `tests/endpoints.test.mjs` (REST route handler status and header assertions)
+  - `tests/analytics_empirical_challenge.mjs` (Dual-mode auth, role scoping & telemetry)
+  - `tests/adversarial_telemetry_stress.mjs` (100k request high-load simulation & chart scaling)
 
 ---
 

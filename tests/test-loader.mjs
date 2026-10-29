@@ -107,6 +107,23 @@ export async function load(url, context, nextLoad) {
           }
           return null;
         }
+        export async function requireAuth() {
+          const user = await getSessionUser();
+          if (!user) throw new Error('Unauthorized');
+          return user;
+        }
+        export async function requireAdmin() {
+          const user = await requireAuth();
+          if (user.role !== 'admin') throw new Error('Forbidden: Admin access required');
+          return user;
+        }
+        export function signJwtToken(payload) {
+          return 'mock-jwt-token';
+        }
+        export function verifyJwtToken(token) {
+          return null;
+        }
+        export const AUTH_COOKIE_NAME = 'timeorbit_token';
       `,
       shortCircuit: true,
     };

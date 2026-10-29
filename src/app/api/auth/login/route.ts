@@ -10,8 +10,12 @@ export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    }
+
+    if (password.length > 128) {
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
     await connectToDatabase();

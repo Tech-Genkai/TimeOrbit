@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { requireAdmin } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ApiKey } from '@/models/ApiKey';
@@ -12,6 +13,11 @@ export async function PATCH(
   try {
     const adminUser = await requireAdmin();
     const { id } = await params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid API key ID format' }, { status: 400 });
+    }
+
     const body = await req.json();
     const { action, rateLimit, rejectionReason } = body;
 

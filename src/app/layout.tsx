@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description:
     'Experience Earth in real-time space 3D with live Sun and Moon celestial telemetry, sunlight terminator, and precision world time calculation engine.',
   keywords: ['solar system', 'planet Earth', 'time zone API', 'world clock', 'celestial observatory', 'TimeOrbit'],
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

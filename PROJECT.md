@@ -33,6 +33,11 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | 18 | Synchronized Dual Clocks Dock | Redesign bottom floating dock with synchronized column grid, custom `<ChevronDown />` selects, and centered time difference summary | M5 | User Request |
 | 19 | Continuous Orbit Auto-Rotation Fix | Eliminate tick-induced snapback in auto-rotation via target change ref tracking and memoized location objects | M5 | User Request |
 | 20 | Slide-Out Celestial Observatory Panel | Live astronomical telemetry panel with solar elevation, azimuth, dawn/dusk twilight times, and lunar illumination metrics | M5 | User Request |
+| 21 | Windows Desktop Live Wallpaper | Standalone offline 3D Earth WebGL live wallpaper (`wallpaper/index.html`) compatible with Lively Wallpaper and Wallpaper Engine | M6 | User Request |
+| 22 | Dual City Dropdowns & Fast Swap | Interactive glassmorphic dropdowns in the floating dock allowing dynamic Origin and Target city selection with localStorage persistence | M6 | User Request |
+| 23 | Universal Cross-Platform CORS | Configured `vercel.json` with permissive headers for seamless integration with Android/Flutter mobile apps and Windows desktop apps | M6 | Architecture |
+| 24 | Enterprise Token Bucket Rate Limiter | $O(1)$ in-memory mathematical rate limiting with continuous replenishment ($\Delta t \times r$), burst capacity, and LRU stale eviction | M7 | Architecture |
+| 25 | Token Bucket Automated Test Suite | Comprehensive unit suite (`tests/tokenBucket.test.mjs`) covering burst limits, continuous refill, variable costs, tenant isolation, and eviction | M7 | Testing |
 
 ---
 
@@ -44,6 +49,8 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | M3 | Feature Polish & UI Enhancements | Fix half-hour timezone scrubber math and add day boundary indicators in `compare/page.tsx`, polish `GlobeCanvas.tsx` constellation markers and camera controls | M1 | DONE |
 | M4 | Automated Test Suite & E2E Hardening | Configure test runner, implement rate limiting in `apiKey.ts`, build comprehensive test suites for `timeEngine`, `apiKey`, and all REST endpoints with 100% pass rate | M1, M2 | DONE |
 | M5 | 3D Space Celestial Stage & UI Redesign | Full 100vh Three.js celestial stage, 48 global cities, shortest-path camera navigation, synchronized clocks dock, uninterrupted auto-rotation, and space theme | M3, M4 | DONE |
+| M6 | Desktop Live Wallpaper & Cross-Platform | Offline WebGL 3D live wallpaper (`wallpaper/`), dual city dropdowns, header-free clean view, `/wallpaper` route, and universal CORS (`vercel.json`) | M5 | DONE |
+| M7 | Token Bucket Traffic Shaping Engine | $O(1)$ Token Bucket algorithm in `src/lib/tokenBucket.ts`, burst handling, continuous refill, dual-engine router, and 72-test suite | M4, M6 | DONE |
 
 ---
 
@@ -97,14 +104,22 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
   - `401 Unauthorized`: Neither valid session token nor valid API key provided.
   - `403 Forbidden`: Non-admin user requesting `scope=global`.
 
-### 2. Rate Limiting Contract (`src/lib/apiKey.ts`)
-- **Function**: `checkRateLimit(keyId: string | Types.ObjectId, limitPerMinute: number = 60): Promise<{ allowed: boolean; remaining: number; resetInSeconds: number }>`
-- Enforces request limit by counting `ApiLog` records within rolling 60-second window.
+### 2. Rate Limiting Contract (`src/lib/apiKey.ts` & `src/lib/tokenBucket.ts`)
+- **Function**: `checkRateLimit(keyId: string | Types.ObjectId, limitPerMinute: number = 60, options?: { algorithm?: 'token_bucket' | 'sliding_window'; cost?: number; burstMultiplier?: number }): Promise<RateLimitResult>`
+- **Token Bucket Engine (`src/lib/tokenBucket.ts`)**: $O(1)$ constant-time calculation replenishing $\frac{\text{limitPerMinute}}{60}\text{ tokens/sec}$ continuously. Supports bursts up to bucket capacity and automatic memory eviction.
+- **Sliding Window Log Engine**: Rolling 60-second window count against `ApiLog` for strict database audit verification.
 
 ### 3. Automated Test Command Contract
 - Command: `npm test`
-- Runner: `vitest run`
-- Output: Executes all test suites in `tests/` and exits with code 0 (100% pass rate).
+- Runner: Node ESM Test Runner with Web API loader
+- Total Tests: **72 passed, 0 failed (100%)**
+- Test Coverage:
+  - `timeEngine.test.mjs` (8 tests)
+  - `apiKey.test.mjs` (8 tests)
+  - `tokenBucket.test.mjs` (9 tests)
+  - `endpoints.test.mjs` (7 tests)
+  - `analytics_empirical_challenge.mjs` (29 tests)
+  - `adversarial_telemetry_stress.mjs` (11 tests)
 
 ---
 
@@ -112,36 +127,46 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 ```
 c:\Users\rajaa\Desktop\website\
 ├── package.json                   # Dependencies, build/lint/test scripts
-├── vitest.config.ts               # Vitest runner config with @ path alias
+├── vercel.json                    # Universal CORS configuration
+├── wallpaper\                     # Standalone Windows desktop live wallpaper
+│   ├── index.html                 # Offline WebGL Three.js Earth
+│   ├── LivelyProperties.json      # Lively Wallpaper manifest
+│   └── README.md
 ├── src\
 │   ├── app\
 │   │   ├── page.tsx               # Homepage with 3D globe & city clocks
 │   │   ├── compare\page.tsx       # Timezone comparison matrix & scrubber
+│   │   ├── wallpaper\page.tsx     # Clean full-screen web wallpaper
 │   │   ├── dashboard\page.tsx     # Developer API keys & usage telemetry
 │   │   ├── admin\page.tsx         # Admin control panel & global metrics
-│   │   ├── login\page.tsx         # User authentication form (secrets removed)
+│   │   ├── login\page.tsx         # User authentication form
 │   │   ├── api\
-│   │   │   ├── analytics\route.ts # [M2] Analytics aggregation route
+│   │   │   ├── analytics\route.ts # Analytics aggregation route
 │   │   │   ├── v1\
 │   │   │   │   ├── time\route.ts
 │   │   │   │   ├── compare\route.ts
 │   │   │   │   └── zones\route.ts
 │   │   │   └── ...
 │   ├── components\
-│   │   ├── globe\GlobeCanvas.tsx  # [M3] 3D WebGL globe interactive canvas
+│   │   ├── globe\GlobeCanvas.tsx  # 3D WebGL globe interactive canvas
 │   │   ├── layout\Navbar.tsx
 │   │   └── ...
 │   ├── lib\
 │   │   ├── timeEngine.ts          # Core astronomical & timezone calculator
-│   │   ├── apiKey.ts              # Key generation, hashing, rate limiting
+│   │   ├── cities.ts              # 70+ global cities catalog
+│   │   ├── tokenBucket.ts         # O(1) Token Bucket rate limiting engine
+│   │   ├── apiKey.ts              # Key generation, hashing, rate limiter router
 │   │   ├── auth.ts                # Session verification
 │   │   └── mongodb.ts
 │   └── models\
 │       ├── ApiKey.ts
 │       ├── ApiLog.ts
 │       └── User.ts
-└── tests\                         # [M4] Automated test suites
-    ├── timeEngine.test.ts
-    ├── apiKey.test.ts
-    └── endpoints.test.ts
+└── tests\                         # Automated test suites (72 tests)
+    ├── timeEngine.test.mjs
+    ├── apiKey.test.mjs
+    ├── tokenBucket.test.mjs
+    ├── endpoints.test.mjs
+    ├── analytics_empirical_challenge.mjs
+    └── adversarial_telemetry_stress.mjs
 ```
