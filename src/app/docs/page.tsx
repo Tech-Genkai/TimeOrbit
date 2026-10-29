@@ -78,21 +78,21 @@ export default function DocsPage() {
 
   const codeSnippets = {
     curl: `# 1. Fetch current time & solar phase for Tokyo
-curl -X GET "https://timeorbit.io/api/v1/time?location=Tokyo" \\
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/time?location=Tokyo" \\
   -H "x-api-key: YOUR_API_KEY"
 
 # 2. Compare planetary coordinates between Tokyo & London
-curl -X GET "https://timeorbit.io/api/v1/compare?from=Tokyo&to=London" \\
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/compare?from=Tokyo&to=London" \\
   -H "x-api-key: YOUR_API_KEY"
 
 # 3. Query supported metropolitan hubs (Public)
-curl -X GET "https://timeorbit.io/api/v1/zones?q=paris"`,
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/zones?q=paris"`,
     javascript: `// Query TimeOrbit API with async/await
 const API_KEY = 'to_live_your_api_key_here';
 
 async function fetchCityTime(location) {
   const response = await fetch(
-    \`https://timeorbit.io/api/v1/time?location=\${encodeURIComponent(location)}\`,
+    \`https://timeorbit-chi.vercel.app/api/v1/time?location=\${encodeURIComponent(location)}\`,
     {
       headers: {
         'x-api-key': API_KEY,
@@ -110,7 +110,7 @@ fetchCityTime('Tokyo');`,
     python: `import requests
 
 API_KEY = "to_live_your_api_key_here"
-BASE_URL = "https://timeorbit.io/api/v1"
+BASE_URL = "https://timeorbit-chi.vercel.app/api/v1"
 
 headers = {
     "x-api-key": API_KEY,

@@ -38,6 +38,11 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | 23 | Universal Cross-Platform CORS | Configured `vercel.json` with permissive headers for seamless integration with Android/Flutter mobile apps and Windows desktop apps | M6 | Architecture |
 | 24 | Enterprise Token Bucket Rate Limiter | $O(1)$ in-memory mathematical rate limiting with continuous replenishment ($\Delta t \times r$), burst capacity, and LRU stale eviction | M7 | Architecture |
 | 25 | Token Bucket Automated Test Suite | Comprehensive unit suite (`tests/tokenBucket.test.mjs`) covering burst limits, continuous refill, variable costs, tenant isolation, and eviction | M7 | Testing |
+| 26 | Production Cloud Deployment | Deployed production app to Vercel at `https://timeorbit-chi.vercel.app/` with automated Git deployment pipeline | M8 | User Request |
+| 27 | Mobile Responsive Dock Redesign | Side-by-side compact dual-clock layout on mobile (`md:hidden`) reducing dock height by 78% and opening >75% screen height to 3D Earth | M8 | User Request |
+| 28 | Multi-Touch Touch Gestures | 2-finger pinch-to-zoom and 1-finger orbit rotation on touchscreens with adaptive mobile camera distance and vertical offset | M8 | User Request |
+| 29 | Progressive Web App Service Worker | Hybrid offline caching in `public/sw.js` and automated registration via `ServiceWorkerRegister.tsx` | M8 | Architecture |
+| 30 | Cross-Platform Cloud CI/CD | GitHub Actions pipeline (`.github/workflows/build-apps.yml`) to compile Android APK and package Windows Live Wallpaper zip | M8 | User Request |
 
 ---
 
@@ -51,6 +56,7 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | M5 | 3D Space Celestial Stage & UI Redesign | Full 100vh Three.js celestial stage, 48 global cities, shortest-path camera navigation, synchronized clocks dock, uninterrupted auto-rotation, and space theme | M3, M4 | DONE |
 | M6 | Desktop Live Wallpaper & Cross-Platform | Offline WebGL 3D live wallpaper (`wallpaper/`), dual city dropdowns, header-free clean view, `/wallpaper` route, and universal CORS (`vercel.json`) | M5 | DONE |
 | M7 | Token Bucket Traffic Shaping Engine | $O(1)$ Token Bucket algorithm in `src/lib/tokenBucket.ts`, burst handling, continuous refill, dual-engine router, and 72-test suite | M4, M6 | DONE |
+| M8 | Production Deployment, Mobile Optimization & Cross-Platform CI/CD | Live Vercel deployment, compact mobile dock redesign, touch pinch-to-zoom, PWA offline service worker, and GitHub Actions APK/Wallpaper builder | M6, M7 | DONE |
 
 ---
 
@@ -128,6 +134,11 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 c:\Users\rajaa\Desktop\website\
 ├── package.json                   # Dependencies, build/lint/test scripts
 ├── vercel.json                    # Universal CORS configuration
+├── .github\
+│   └── workflows\
+│       └── build-apps.yml         # CI/CD: Android APK & Windows Wallpaper packaging
+├── public\
+│   └── sw.js                      # PWA offline service worker
 ├── wallpaper\                     # Standalone Windows desktop live wallpaper
 │   ├── index.html                 # Offline WebGL Three.js Earth
 │   ├── LivelyProperties.json      # Lively Wallpaper manifest

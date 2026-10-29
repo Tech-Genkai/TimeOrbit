@@ -588,18 +588,21 @@ export default function HomePage() {
           ) : (
             <div className="max-w-3xl mx-auto glass-panel rounded-2xl p-2 sm:p-3 border border-white/10 shadow-2xl backdrop-blur-xl pointer-events-auto space-y-1.5 transition-all">
               {/* ======================================================= */}
-              {/* MOBILE COMPACT DOCK (< md)                              */}
               {/* ======================================================= */}
-              <div className="md:hidden space-y-1.5">
-                <div className="grid grid-cols-11 gap-1.5 items-center">
-                  {/* City A (5 cols) */}
+              {/* MOBILE ULTRA-CLEAN BALANCED DOCK (< md)                 */}
+              {/* ======================================================= */}
+              <div className="md:hidden space-y-2">
+                {/* Dual City Card */}
+                <div className="bg-black/80 backdrop-blur-xl rounded-2xl border border-white/15 p-2.5 shadow-2xl space-y-2">
+                  {/* City A Row */}
                   <div
                     onClick={handleSwitchToLocationA}
-                    className="col-span-5 p-2 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md flex flex-col justify-between cursor-pointer active:scale-98 transition-all"
+                    className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1 min-w-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shrink-0" />
+                    {/* Left: Indicator + City Dropdown */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] shrink-0 shadow-[0_0_10px_#38bdf8]" />
+                      <div className="relative min-w-0 flex-1">
                         <select
                           value={cityA.id}
                           onClick={(e) => e.stopPropagation()}
@@ -610,25 +613,26 @@ export default function HomePage() {
                               setFocusedTarget('primary');
                             }
                           }}
-                          className="w-full appearance-none pr-3 text-[11px] font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
+                          className="w-full appearance-none pr-5 text-xs font-semibold tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
                         >
                           {REGION_GROUPS.map((group) => (
-                            <optgroup key={`mob-dock-a-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
+                            <optgroup key={`mob-a-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
                               {group.cities.map((c) => (
-                                <option key={`mda-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                                <option key={`ma-${c.id}`} value={c.id} className="text-white bg-zinc-900">
                                   {c.city}
                                 </option>
                               ))}
                             </optgroup>
                           ))}
                         </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
-                      <span className="text-[9px] font-mono text-zinc-400 shrink-0">{timeA?.utcOffset}</span>
                     </div>
 
-                    <div className="flex items-baseline justify-between pt-0.5">
-                      <span suppressHydrationWarning className="text-base font-light font-mono text-white tracking-wider">
-                        {timeA?.currentTime || '--:--'}
+                    {/* Right: Digital Time + GPS + UTC */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span suppressHydrationWarning className="text-sm sm:text-base font-mono font-light text-white tracking-wider whitespace-nowrap">
+                        {timeA?.currentTime || '--:--:--'}
                       </span>
                       <button
                         type="button"
@@ -637,35 +641,40 @@ export default function HomePage() {
                           handleDetectLocation();
                         }}
                         disabled={isLocating}
-                        className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 flex items-center gap-1"
+                        className="p-1 rounded-md text-zinc-300 hover:text-white bg-white/10 border border-white/15 active:scale-95 transition-all"
                         title="Detect GPS"
                       >
-                        <Navigation className={`w-2.5 h-2.5 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
-                        <span>GPS</span>
+                        <Navigation className={`w-3 h-3 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
                       </button>
+                      <span className="text-[10px] font-mono text-zinc-400 w-12 text-right">
+                        {timeA?.utcOffset}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Center Swap (1 col) */}
-                  <div className="col-span-1 flex items-center justify-center">
+                  {/* Center Divider with Interactive Swap Button */}
+                  <div className="relative flex items-center justify-center my-0.5">
+                    <div className="w-full border-t border-white/10" />
                     <button
                       type="button"
                       onClick={handleSwap}
-                      className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-[#fea082] border border-white/20 transition-all flex items-center justify-center cursor-pointer shadow-md"
-                      title="Swap Locations"
+                      className="absolute px-2.5 py-0.5 rounded-full bg-zinc-900 border border-white/25 text-[#fea082] hover:text-white text-[10px] font-mono tracking-wider flex items-center gap-1.5 shadow-lg active:scale-95 transition-all cursor-pointer"
+                      title="Swap City A & City B"
                     >
-                      <ArrowRightLeft className="w-3 h-3" />
+                      <ArrowRightLeft className="w-2.5 h-2.5" />
+                      <span className="text-[9px] font-medium tracking-widest">SWAP</span>
                     </button>
                   </div>
 
-                  {/* City B (5 cols) */}
+                  {/* City B Row */}
                   <div
                     onClick={handleSwitchToLocationB}
-                    className="col-span-5 p-2 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md flex flex-col justify-between cursor-pointer active:scale-98 transition-all"
+                    className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1 min-w-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#fea082] shrink-0" />
+                    {/* Left: Indicator + City Dropdown */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#fea082] shrink-0 shadow-[0_0_10px_#fea082]" />
+                      <div className="relative min-w-0 flex-1">
                         <select
                           value={cityB.id}
                           onClick={(e) => e.stopPropagation()}
@@ -676,28 +685,30 @@ export default function HomePage() {
                               setFocusedTarget('secondary');
                             }
                           }}
-                          className="w-full appearance-none pr-3 text-[11px] font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
+                          className="w-full appearance-none pr-5 text-xs font-semibold tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
                         >
                           {REGION_GROUPS.map((group) => (
-                            <optgroup key={`mob-dock-b-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
+                            <optgroup key={`mob-b-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
                               {group.cities.map((c) => (
-                                <option key={`mdb-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                                <option key={`mb-${c.id}`} value={c.id} className="text-white bg-zinc-900">
                                   {c.city}
                                 </option>
                               ))}
                             </optgroup>
                           ))}
                         </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
-                      <span className="text-[9px] font-mono text-zinc-400 shrink-0">{timeB?.utcOffset}</span>
                     </div>
 
-                    <div className="flex items-baseline justify-between pt-0.5">
-                      <span suppressHydrationWarning className="text-base font-light font-mono text-[#fea082] tracking-wider">
-                        {timeB?.currentTime || '--:--'}
+                    {/* Right: Digital Time + UTC */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span suppressHydrationWarning className="text-sm sm:text-base font-mono font-light text-[#fea082] tracking-wider whitespace-nowrap">
+                        {timeB?.currentTime || '--:--:--'}
                       </span>
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase">
-                        {getTimezoneAbbrev(cityB.timezone)}
+                      <span className="w-6" />
+                      <span className="text-[10px] font-mono text-zinc-400 w-12 text-right">
+                        {timeB?.utcOffset}
                       </span>
                     </div>
                   </div>
@@ -705,30 +716,30 @@ export default function HomePage() {
 
                 {/* Mobile Drawer (Visible when toggled) */}
                 {isMobileDetailOpen && (
-                  <div className="p-2.5 rounded-xl bg-black/85 border border-white/10 text-[10px] space-y-1.5 backdrop-blur-md">
-                    <div className="flex justify-between items-center text-zinc-400 border-b border-white/10 pb-1">
-                      <span>{cityA.city}: <span className="text-white" suppressHydrationWarning>{timeA?.currentDate}</span></span>
-                      <span className="font-mono text-[9px]">{formatCoordinates(cityA.lat, cityA.lng)}</span>
+                  <div className="p-3 rounded-2xl bg-black/85 border border-white/15 text-[10px] space-y-2 backdrop-blur-xl animate-fadeIn shadow-2xl">
+                    <div className="flex justify-between items-center text-zinc-400 border-b border-white/10 pb-1.5">
+                      <span className="text-white font-medium">{cityA.city}: <span className="text-zinc-300 font-light" suppressHydrationWarning>{timeA?.currentDate}</span></span>
+                      <span className="font-mono text-[9px] text-[#38bdf8]">{formatCoordinates(cityA.lat, cityA.lng)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-zinc-400 border-b border-white/10 pb-1">
-                      <span>{cityB.city}: <span className="text-white" suppressHydrationWarning>{timeB?.currentDate}</span></span>
-                      <span className="font-mono text-[9px]">{formatCoordinates(cityB.lat, cityB.lng)}</span>
+                    <div className="flex justify-between items-center text-zinc-400 border-b border-white/10 pb-1.5">
+                      <span className="text-[#fea082] font-medium">{cityB.city}: <span className="text-zinc-300 font-light" suppressHydrationWarning>{timeB?.currentDate}</span></span>
+                      <span className="font-mono text-[9px] text-[#fea082]">{formatCoordinates(cityB.lat, cityB.lng)}</span>
                     </div>
                     <div className="flex items-center justify-between pt-1">
                       <button
                         type="button"
                         onClick={handleOpenGoogleCalendar}
-                        className="px-2.5 py-1 rounded text-[9px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg text-[10px] font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 hover:bg-emerald-900/60 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                       >
-                        <Calendar className="w-2.5 h-2.5" />
+                        <Calendar className="w-3 h-3 text-emerald-400" />
                         <span>Google Cal</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleDownloadIcs}
-                        className="px-2.5 py-1 rounded text-[9px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-500/30 flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg text-[10px] font-mono text-cyan-300 bg-cyan-950/60 border border-cyan-500/40 hover:bg-cyan-900/60 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                       >
-                        <Download className="w-2.5 h-2.5" />
+                        <Download className="w-3 h-3 text-cyan-400" />
                         <span>.ICS Invite</span>
                       </button>
                     </div>
@@ -736,27 +747,27 @@ export default function HomePage() {
                 )}
 
                 {/* Mobile Bottom Bar: Difference + Details Toggle + Minimize */}
-                <div className="flex items-center justify-between text-[10px] uppercase font-light text-zinc-300 pt-1 border-t border-white/10 px-0.5">
+                <div className="flex items-center justify-between text-[11px] font-light text-zinc-300 px-1 pt-0.5">
                   <div className="flex items-center gap-1.5 truncate">
                     {comparison && (
-                      <>
+                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[10px] font-mono text-[#fea082]">
                         <Clock className="w-2.5 h-2.5 text-[#fea082] shrink-0" />
                         <span className="truncate">{comparison.formattedDifference}</span>
-                      </>
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => setIsMobileDetailOpen((prev) => !prev)}
-                      className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 cursor-pointer"
+                      className="px-2.5 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 cursor-pointer active:scale-95 transition-all"
                     >
-                      {isMobileDetailOpen ? 'Hide' : 'Details'}
+                      {isMobileDetailOpen ? 'Less' : 'Details'}
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsDockCollapsed(true)}
-                      className="text-zinc-500 hover:text-zinc-300 p-0.5 rounded cursor-pointer"
+                      className="text-zinc-500 hover:text-zinc-300 p-1 rounded-full hover:bg-white/10 cursor-pointer"
                       title="Minimize Dock"
                     >
                       <ChevronDown className="w-3.5 h-3.5" />
@@ -765,7 +776,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* ======================================================= */}
               {/* DESKTOP FULL DOCK (>= md)                               */}
               {/* ======================================================= */}
               <div className="hidden md:block space-y-2">
@@ -1518,7 +1528,7 @@ export default function HomePage() {
                 <button
                   onClick={() =>
                     copySnippet(
-                      `fetch('https://timeorbit.vercel.app/api/v1/compare?from=${cityA.id}&to=${cityB.id}')`
+                      `fetch('https://timeorbit-chi.vercel.app/api/v1/compare?from=${cityA.id}&to=${cityB.id}')`
                     )
                   }
                   className="text-[10px] text-zinc-400 hover:text-white transition-colors cursor-pointer"

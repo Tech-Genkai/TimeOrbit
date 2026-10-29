@@ -1,5 +1,6 @@
 # 🌍 TimeOrbit
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-timeorbit--chi.vercel.app-00dfa2?style=for-the-badge&logo=vercel)](https://timeorbit-chi.vercel.app/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.4.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.3.0-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -16,6 +17,10 @@
 
 - [Overview & Value Proposition](#-overview--value-proposition)
 - [Key Features](#-key-features)
+- [Mobile & Responsive Architecture](#-mobile--responsive-architecture)
+- [Progressive Web App (PWA) Offline Engine](#-progressive-web-app-pwa-offline-engine)
+- [Cloud CI/CD & Cross-Platform Pipelines](#-cloud-cicd--cross-platform-pipelines)
+- [Architectural Analysis: Token Bucket vs. Apache Kafka](#-architectural-analysis-token-bucket-vs-apache-kafka)
 - [Architecture & Request Lifecycle](#-architecture--request-lifecycle)
 - [Tech Stack](#-tech-stack)
 - [Getting Started](#-getting-started)
@@ -105,6 +110,35 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 - Cryptographic SHA-256 API key hashing (`to_live_...` prefix; plaintext keys are never persisted).
 - Token Bucket rate limiting and MongoDB rolling window logging.
 - Passwords hashed with `bcryptjs` (salt rounds: 12) and sessions secured via HTTP-only, SameSite JWT cookies.
+
+### 📱 Mobile & Responsive Architecture
+- **Compact Dual-Clock Dock (`md:hidden`)**: Side-by-side City A (5 cols), central swap (1 col), and City B (5 cols) layout reducing dock height by 78% (~80px vs ~370px).
+- **Unobstructed Globe Visibility**: Over 75% of the mobile screen height is dedicated to the 3D celestial sphere, preventing Earth's lower hemisphere from being cut off.
+- **Multi-Touch Gestures**: Seamless 2-finger pinch-to-zoom and 1-finger orbit rotation on touchscreens.
+- **Adaptive Camera Framing**: Intelligent distance (`isMobile ? 6.2 : 5.8`) and vertical centering offset (`vOffset = Math.round(height * 0.05)`).
+- **Expandable Details Drawer**: One-tap toggle to reveal full dates, coordinates, and 1-click meeting export links (`Google Cal`, `.ICS`).
+
+### 📦 Progressive Web App (PWA) Offline Engine
+- **Hybrid Service Worker (`public/sw.js`)**: Implements network-first caching for HTML navigation, stale-while-revalidate for styles and scripts, and cache-first for WebGL textures and icons.
+- **Offline Reliability**: Enables offline app initialization and instant load times on both Android and desktop Chrome/Edge.
+- **Automated Client Registration**: `ServiceWorkerRegister.tsx` smoothly registers the service worker upon window mount.
+
+### 🚀 Cloud CI/CD & Cross-Platform Pipelines
+- **Automated GitHub Actions (`.github/workflows/build-apps.yml`)**:
+  - Automatically compiles Android Trusted Web Activity (TWA) APK via `@bubblewrap/cli` using JDK 17 and Android CLI tools.
+  - Automatically packages the Windows Desktop Live Wallpaper zip containing `index.html`, `LivelyProperties.json`, textures, and setup documentation.
+  - Generates downloadable GitHub Release artifacts on every tag/release.
+
+### 🧠 Architectural Analysis: Token Bucket vs. Apache Kafka
+
+| Dimension | Token Bucket Algorithm (`src/lib/tokenBucket.ts`) | Apache Kafka (Event Streaming) |
+|---|---|---|
+| **Primary Use Case** | Synchronous HTTP Gateway Rate Limiting & Traffic Shaping | Asynchronous High-Volume Event Logging & Analytics Pipelines |
+| **Execution Latency** | **Sub-millisecond ($O(1)$ in-memory compute)** | 5ms–20ms network publish overhead to broker partitions |
+| **Request Handling** | Immediate decision: **Allow (200)** or **Throttle (429 with `Retry-After`)** | Queues messages into topic offsets; not suited for synchronous request blocking |
+| **Burst Capacity** | Built-in via mathematical bucket depth ($C \times \text{burstMultiplier}$) | Infinite buffering via disk logs, but consumers must drain lag |
+| **Operational Footprint**| **Zero infrastructure dependencies** (pure Node.js / TypeScript) | Requires JVM cluster, ZooKeeper / KRaft, partitions, and worker consumers |
+| **Role in TimeOrbit** | **Active Rate Limiter**: Enforces strict tier limits on API endpoints without latency penalties. | **Future Telemetry Pipeline**: Ideal as an asynchronous sink for routing millions of `ApiLog` audit events to ClickHouse / BigQuery. |
 
 ---
 
@@ -270,7 +304,7 @@ Retrieves current astronomical time, solar state, and UTC offset for a city.
 
 **Example Request:**
 ```bash
-curl -X GET "http://localhost:3000/api/v1/time?location=Tokyo" \
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/time?location=Tokyo" \
   -H "x-api-key: to_live_your_api_key_here"
 ```
 
@@ -314,7 +348,7 @@ Compares two cities, computes directional time differences, and generates a 24-h
 
 **Example Request:**
 ```bash
-curl -X GET "http://localhost:3000/api/v1/compare?from=Tokyo&to=London" \
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/compare?from=Tokyo&to=London" \
   -H "x-api-key: to_live_your_api_key_here"
 ```
 
@@ -364,7 +398,7 @@ Returns the catalog of 38 pre-configured world cities, flags, coordinates, and t
 
 **Example Request:**
 ```bash
-curl -X GET "http://localhost:3000/api/v1/zones?q=tokyo"
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/zones?q=tokyo"
 ```
 
 **Example Response (`200 OK`):**
@@ -522,6 +556,11 @@ TimeOrbit/
 ├── PROJECT.md                       # Engineering milestones & technical specifications
 ├── TEST_INFRA.md                    # Test infrastructure and scenario matrices
 ├── package.json                     # Project manifest and scripts
+├── .github/
+│   └── workflows/
+│       └── build-apps.yml           # CI/CD: Android APK & Windows Wallpaper release builder
+├── public/                          # Static assets and favicons
+│   └── sw.js                        # PWA Offline Service Worker
 ├── wallpaper/                       # Standalone Windows desktop live wallpaper
 │   ├── index.html                   # Offline WebGL 3D Earth live wallpaper
 │   ├── LivelyProperties.json        # Windows Lively Wallpaper properties manifest

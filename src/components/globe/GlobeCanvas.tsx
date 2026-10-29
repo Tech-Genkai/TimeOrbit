@@ -347,7 +347,10 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
   const focusOnCoordinates = useCallback((lat: number, lng: number, distance?: number) => {
     targetLatRef.current = Math.max(-75, Math.min(75, lat));
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-    targetDistRef.current = distance !== undefined ? (isMobile ? distance + 0.6 : distance) : (isMobile ? 6.2 : 5.8);
+    const isPortrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+    targetDistRef.current = distance !== undefined
+      ? (isMobile ? (isPortrait ? distance + 2.0 : distance + 0.8) : distance)
+      : (isMobile && isPortrait ? 8.0 : (isMobile ? 6.2 : 5.8));
 
     const current = currentLngRef.current;
     const diff = ((((lng - current) % 360) + 540) % 360) - 180;
@@ -397,7 +400,9 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       focusOnCoordinates(issState.lat, issState.lng, 4.4);
     }
     if (targetChanged && focusedTarget === 'earth') {
-      targetDistRef.current = 5.8;
+      const isMob = typeof window !== 'undefined' && window.innerWidth < 640;
+      const isPort = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+      targetDistRef.current = isMob && isPort ? 8.0 : (isMob ? 6.2 : 5.8);
     }
   }, [
     focusedTarget,
@@ -421,8 +426,8 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     // Elevate Earth in the viewport (adaptive in portrait mode so it centers gracefully above the bottom dock)
     const isPortrait = height > width;
     const isMobile = width < 640;
-    const vOffset = isPortrait ? Math.round(height * 0.05) : Math.round(height * 0.12);
-    const defaultDist = isMobile ? 6.2 : 5.8;
+    const vOffset = isPortrait ? Math.round(height * 0.035) : Math.round(height * 0.12);
+    const defaultDist = isMobile && isPortrait ? 8.0 : (isMobile ? 6.2 : 5.8);
     targetDistRef.current = defaultDist;
 
     const scene = new THREE.Scene();
@@ -547,12 +552,12 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     scene.add(polarAxis);
 
     const northPoleSprite = createMarkerSprite('N. POLE', '#8cbaff', 'rgba(0, 0, 0, 0.75)');
-    northPoleSprite.position.set(0, earthRadius * 1.38, 0);
+    northPoleSprite.position.set(0, earthRadius * 1.14, 0);
     northPoleSprite.scale.set(0.38, 0.10, 1);
     scene.add(northPoleSprite);
 
     const southPoleSprite = createMarkerSprite('S. POLE', '#8cbaff', 'rgba(0, 0, 0, 0.75)');
-    southPoleSprite.position.set(0, -earthRadius * 1.38, 0);
+    southPoleSprite.position.set(0, -earthRadius * 1.14, 0);
     southPoleSprite.scale.set(0.38, 0.10, 1);
     scene.add(southPoleSprite);
 
@@ -858,7 +863,10 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       const w = container.clientWidth;
       const h = container.clientHeight;
       const isPortrait = h > w;
-      const vOffset = isPortrait ? Math.round(h * 0.05) : Math.round(h * 0.12);
+      const isMobile = w < 640;
+      const vOffset = isPortrait ? Math.round(h * 0.035) : Math.round(h * 0.12);
+      const defaultDist = isMobile && isPortrait ? 8.0 : (isMobile ? 6.2 : 5.8);
+      targetDistRef.current = defaultDist;
       cameraRef.current.aspect = w / h;
       cameraRef.current.setViewOffset(w, h, 0, vOffset, w, h);
       cameraRef.current.updateProjectionMatrix();

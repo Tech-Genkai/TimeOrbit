@@ -854,7 +854,7 @@ export default function DashboardPage() {
 
         {/* Code Block */}
         <div className="relative rounded-xl bg-[#030611] p-4 font-mono text-xs text-gray-300 border border-white/10 overflow-x-auto">
-          <pre>{`curl -X GET "${typeof window !== 'undefined' ? window.location.origin : 'https://timeorbit.vercel.app'}/api/v1/compare?from=Tokyo&to=New_York" \\
+          <pre>{`curl -X GET "${typeof window !== 'undefined' ? window.location.origin : 'https://timeorbit-chi.vercel.app'}/api/v1/compare?from=Tokyo&to=New_York" \\
   -H "x-api-key: ${activeKey ? activeKey.keyPrefix + '...' + activeKey.lastFour : 'to_live_YOUR_APPROVED_KEY'}"`}</pre>
         </div>
       </div>
