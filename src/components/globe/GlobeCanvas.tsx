@@ -331,19 +331,23 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       targetDistRef.current = Math.min(8.5, targetDistRef.current + 0.7);
     },
     resetZoom: () => {
-      targetDistRef.current = 5.8;
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+      targetDistRef.current = isMobile ? 6.2 : 5.8;
     },
   }));
 
-  // Drag interaction state
+  // Drag & Multi-Touch interaction state
   const isDraggingRef = useRef<boolean>(false);
   const prevPointerX = useRef<number>(0);
   const prevPointerY = useRef<number>(0);
+  const activePointersRef = useRef<Map<number, { clientX: number; clientY: number }>>(new Map());
+  const prevPinchDistRef = useRef<number | null>(null);
 
   // Shortest-path angle normalization to smoothly pivot camera without wild multi-turn spinning
-  const focusOnCoordinates = useCallback((lat: number, lng: number, distance = 5.8) => {
+  const focusOnCoordinates = useCallback((lat: number, lng: number, distance?: number) => {
     targetLatRef.current = Math.max(-75, Math.min(75, lat));
-    targetDistRef.current = distance;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    targetDistRef.current = distance !== undefined ? (isMobile ? distance + 0.6 : distance) : (isMobile ? 6.2 : 5.8);
 
     const current = currentLngRef.current;
     const diff = ((((lng - current) % 360) + 540) % 360) - 180;
@@ -414,15 +418,19 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
 
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
-    // Elevate Earth slightly in the viewport so it never collides with the bottom floating dock
-    const vOffset = Math.round(height * 0.12);
+    // Elevate Earth in the viewport (adaptive in portrait mode so it centers gracefully above the bottom dock)
+    const isPortrait = height > width;
+    const isMobile = width < 640;
+    const vOffset = isPortrait ? Math.round(height * 0.05) : Math.round(height * 0.12);
+    const defaultDist = isMobile ? 6.2 : 5.8;
+    targetDistRef.current = defaultDist;
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     camera.setViewOffset(width, height, 0, vOffset, width, height);
-    camera.position.set(0, 0, 5.8);
+    camera.position.set(0, 0, defaultDist);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -849,7 +857,8 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       if (!container || !rendererRef.current || !cameraRef.current) return;
       const w = container.clientWidth;
       const h = container.clientHeight;
-      const vOffset = Math.round(h * 0.12);
+      const isPortrait = h > w;
+      const vOffset = isPortrait ? Math.round(h * 0.05) : Math.round(h * 0.12);
       cameraRef.current.aspect = w / h;
       cameraRef.current.setViewOffset(w, h, 0, vOffset, w, h);
       cameraRef.current.updateProjectionMatrix();
@@ -958,32 +967,69 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     return () => clearInterval(interval);
   }, [primaryLocation.lat, primaryLocation.lng, secondaryLocation.lat, secondaryLocation.lng]);
 
-  // Pointer drag to orbit camera around Earth, Sun & Moon
+  // Multi-Touch & Pointer drag to orbit camera and pinch-to-zoom
   const handlePointerDown = (e: React.PointerEvent) => {
-    isDraggingRef.current = true;
-    prevPointerX.current = e.clientX;
-    prevPointerY.current = e.clientY;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    if (activePointersRef.current.size === 1) {
+      isDraggingRef.current = true;
+      prevPointerX.current = e.clientX;
+      prevPointerY.current = e.clientY;
+      prevPinchDistRef.current = null;
+    } else if (activePointersRef.current.size === 2) {
+      // Two fingers down: initialize pinch distance
+      isDraggingRef.current = false;
+      const pts = Array.from(activePointersRef.current.values());
+      prevPinchDistRef.current = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+    }
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {}
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDraggingRef.current) return;
-    const deltaX = e.clientX - prevPointerX.current;
-    const deltaY = e.clientY - prevPointerY.current;
-    prevPointerX.current = e.clientX;
-    prevPointerY.current = e.clientY;
+    if (!activePointersRef.current.has(e.pointerId)) return;
+    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
 
-    targetLngRef.current -= deltaX * 0.42;
-    targetLatRef.current = Math.max(-75, Math.min(75, targetLatRef.current + deltaY * 0.32));
+    if (activePointersRef.current.size === 2) {
+      // Multi-Touch Pinch-to-Zoom
+      const pts = Array.from(activePointersRef.current.values());
+      const currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+      if (prevPinchDistRef.current !== null && prevPinchDistRef.current > 0) {
+        const delta = currentDist - prevPinchDistRef.current;
+        // Smoothly adjust camera distance
+        targetDistRef.current = Math.max(3.2, Math.min(8.5, targetDistRef.current - delta * 0.015));
+      }
+      prevPinchDistRef.current = currentDist;
+    } else if (activePointersRef.current.size === 1 && isDraggingRef.current) {
+      // Single Finger / Mouse Orbit
+      const deltaX = e.clientX - prevPointerX.current;
+      const deltaY = e.clientY - prevPointerY.current;
+      prevPointerX.current = e.clientX;
+      prevPointerY.current = e.clientY;
+
+      targetLngRef.current -= deltaX * 0.42;
+      targetLatRef.current = Math.max(-75, Math.min(75, targetLatRef.current + deltaY * 0.32));
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    isDraggingRef.current = false;
+    activePointersRef.current.delete(e.pointerId);
+
+    if (activePointersRef.current.size === 1) {
+      const remaining = Array.from(activePointersRef.current.values())[0];
+      prevPointerX.current = remaining.clientX;
+      prevPointerY.current = remaining.clientY;
+      isDraggingRef.current = true;
+      prevPinchDistRef.current = null;
+    } else if (activePointersRef.current.size === 0) {
+      isDraggingRef.current = false;
+      prevPinchDistRef.current = null;
+    }
+
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Ignore
-    }
+    } catch {}
   };
 
   return (

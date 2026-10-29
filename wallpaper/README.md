@@ -39,7 +39,7 @@ A minimalist, high-luxury desktop live wallpaper featuring a real-time rotating 
 
 ### Option 3: Quick Browser Preview
 - Double-click `wallpaper/index.html` to open directly in Chrome/Edge/Firefox, and press **F11** for full-screen.
-- Or visit the web route at [`/wallpaper`](https://timeorbit.vercel.app/wallpaper).
+- Or visit the web route at [`/wallpaper`](https://timeorbit-chi.vercel.app/wallpaper).
 
 ---
 

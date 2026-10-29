@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import ServiceWorkerRegister from '@/components/pwa/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
   title: 'TimeOrbit — Planetary Time & Solar Celestial Explorer',
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full bg-black">
       <body className="min-h-screen flex flex-col bg-black text-slate-100 antialiased selection:bg-[#fea082]/30 selection:text-white">
+        <ServiceWorkerRegister />
         <Navbar />
         <main className="flex-1 flex flex-col">{children}</main>
         <Footer />

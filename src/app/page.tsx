@@ -89,6 +89,7 @@ export default function HomePage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   // Dock collapse toggle state
   const [isDockCollapsed, setIsDockCollapsed] = useState(false);
+  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
 
   // 24-Hour Scrubber state
   const [scrubberHour, setScrubberHour] = useState<number>(12);
@@ -335,9 +336,9 @@ export default function HomePage() {
           />
         </div>
 
-        {/* --- Top Header (Directly inspired by attached Solar Explorer .logo) --- */}
-        <div className="relative z-10 w-full pt-4 px-4 sm:px-8 flex items-center justify-between pointer-events-none">
-          <div className="pointer-events-auto">
+        {/* --- Top Header (Clean on mobile, expanded on desktop) --- */}
+        <div className="relative z-10 w-full pt-3 px-3 sm:pt-4 sm:px-8 flex items-center justify-between pointer-events-none">
+          <div className="pointer-events-auto hidden sm:block">
             <h1 className="text-base sm:text-xl font-light tracking-[0.28em] uppercase text-white drop-shadow">
               TimeOrbit Explorer
             </h1>
@@ -346,7 +347,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto ml-auto sm:ml-0">
             {/* Viewport Zoom & Rotation Controls */}
             <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full border border-white/20 p-1 shadow-lg">
               <button
@@ -585,18 +586,23 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto glass-panel rounded-2xl p-2.5 sm:p-3 border border-white/10 shadow-2xl backdrop-blur-xl pointer-events-auto space-y-2 transition-all">
-              {/* Clocks & Controls Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-11 gap-2.5 items-stretch">
-                {/* Location A Column (5 cols) */}
-                <div className="md:col-span-5 p-2.5 rounded-xl border border-white/10 bg-black/60 transition-all flex flex-col justify-between gap-1 shadow-md">
-                  {/* Card Header: Dropdown + GPS + UTC Offset */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="relative flex-1 flex items-center gap-1.5 min-w-0">
-                      <span className="w-2 h-2 rounded-full bg-[#38bdf8] shrink-0" />
-                      <div className="relative flex-1 min-w-0">
+            <div className="max-w-3xl mx-auto glass-panel rounded-2xl p-2 sm:p-3 border border-white/10 shadow-2xl backdrop-blur-xl pointer-events-auto space-y-1.5 transition-all">
+              {/* ======================================================= */}
+              {/* MOBILE COMPACT DOCK (< md)                              */}
+              {/* ======================================================= */}
+              <div className="md:hidden space-y-1.5">
+                <div className="grid grid-cols-11 gap-1.5 items-center">
+                  {/* City A (5 cols) */}
+                  <div
+                    onClick={handleSwitchToLocationA}
+                    className="col-span-5 p-2 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md flex flex-col justify-between cursor-pointer active:scale-98 transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shrink-0" />
                         <select
                           value={cityA.id}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => {
                             const found = CITIES.find((c) => c.id === e.target.value);
                             if (found) {
@@ -604,84 +610,65 @@ export default function HomePage() {
                               setFocusedTarget('primary');
                             }
                           }}
-                          className="w-full appearance-none pr-6 text-xs font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
+                          className="w-full appearance-none pr-3 text-[11px] font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
                         >
                           {REGION_GROUPS.map((group) => (
-                            <optgroup key={`dock-a-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
+                            <optgroup key={`mob-dock-a-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
                               {group.cities.map((c) => (
-                                <option key={`da-${c.id}`} value={c.id} className="text-white bg-zinc-900">
-                                  {c.city}, {c.country}
+                                <option key={`mda-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                                  {c.city}
                                 </option>
                               ))}
                             </optgroup>
                           ))}
                         </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
+                      <span className="text-[9px] font-mono text-zinc-400 shrink-0">{timeA?.utcOffset}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-baseline justify-between pt-0.5">
+                      <span suppressHydrationWarning className="text-base font-light font-mono text-white tracking-wider">
+                        {timeA?.currentTime || '--:--'}
+                      </span>
                       <button
                         type="button"
-                        onClick={handleDetectLocation}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDetectLocation();
+                        }}
                         disabled={isLocating}
-                        className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider uppercase text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-[#38bdf8] transition-all cursor-pointer flex items-center gap-1"
-                        title="Detect current location via GPS"
+                        className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 flex items-center gap-1"
+                        title="Detect GPS"
                       >
                         <Navigation className={`w-2.5 h-2.5 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
                         <span>GPS</span>
                       </button>
-                      <span className="text-[10px] font-mono text-zinc-400">
-                        {timeA?.utcOffset}
-                      </span>
                     </div>
                   </div>
 
-                  {/* Card Body: Digital Time (Click to focus on Globe) */}
-                  <div
-                    onClick={handleSwitchToLocationA}
-                    className="cursor-pointer group flex items-baseline justify-between"
-                    title="Click to focus 3D Earth on Location A"
-                  >
-                    <div
-                      suppressHydrationWarning
-                      className="text-xl sm:text-2xl font-light font-mono text-white tracking-wider group-hover:text-[#38bdf8] transition-colors"
+                  {/* Center Swap (1 col) */}
+                  <div className="col-span-1 flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={handleSwap}
+                      className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-[#fea082] border border-white/20 transition-all flex items-center justify-center cursor-pointer shadow-md"
+                      title="Swap Locations"
                     >
-                      {timeA?.currentTime || '--:--:--'}
-                    </div>
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest hidden sm:inline">
-                      {getTimezoneAbbrev(cityA.timezone)}
-                    </span>
+                      <ArrowRightLeft className="w-3 h-3" />
+                    </button>
                   </div>
 
-                  {/* Card Footer: Date & Coordinates */}
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-light border-t border-white/5 pt-1">
-                    <span suppressHydrationWarning>{timeA?.currentDate}</span>
-                    <span className="font-mono text-[9px]">{formatCoordinates(cityA.lat, cityA.lng)}</span>
-                  </div>
-                </div>
-
-                {/* Center Swap Column (1 col) */}
-                <div className="md:col-span-1 flex flex-col items-center justify-center py-1">
-                  <button
-                    type="button"
-                    onClick={handleSwap}
-                    className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-[#fea082] border border-white/20 transition-all hover:rotate-180 duration-300 cursor-pointer shadow-md"
-                    title="Click to Swap Location A and Location B"
+                  {/* City B (5 cols) */}
+                  <div
+                    onClick={handleSwitchToLocationB}
+                    className="col-span-5 p-2 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md flex flex-col justify-between cursor-pointer active:scale-98 transition-all"
                   >
-                    <ArrowRightLeft className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Location B Column (5 cols) */}
-                <div className="md:col-span-5 p-2.5 rounded-xl border border-white/10 bg-black/60 transition-all flex flex-col justify-between gap-1 shadow-md">
-                  {/* Card Header: Dropdown + UTC Offset */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="relative flex-1 flex items-center gap-1.5 min-w-0">
-                      <span className="w-2 h-2 rounded-full bg-[#fea082] shrink-0" />
-                      <div className="relative flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#fea082] shrink-0" />
                         <select
                           value={cityB.id}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => {
                             const found = CITIES.find((c) => c.id === e.target.value);
                             if (found) {
@@ -689,93 +676,290 @@ export default function HomePage() {
                               setFocusedTarget('secondary');
                             }
                           }}
-                          className="w-full appearance-none pr-6 text-xs font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
+                          className="w-full appearance-none pr-3 text-[11px] font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
                         >
                           {REGION_GROUPS.map((group) => (
-                            <optgroup key={`dock-b-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
+                            <optgroup key={`mob-dock-b-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
                               {group.cities.map((c) => (
-                                <option key={`db-${c.id}`} value={c.id} className="text-white bg-zinc-900">
-                                  {c.city}, {c.country}
+                                <option key={`mdb-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                                  {c.city}
                                 </option>
                               ))}
                             </optgroup>
                           ))}
                         </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
+                      <span className="text-[9px] font-mono text-zinc-400 shrink-0">{timeB?.utcOffset}</span>
                     </div>
 
-                    <span className="text-[10px] font-mono text-zinc-400 shrink-0">
-                      {timeB?.utcOffset}
-                    </span>
+                    <div className="flex items-baseline justify-between pt-0.5">
+                      <span suppressHydrationWarning className="text-base font-light font-mono text-[#fea082] tracking-wider">
+                        {timeB?.currentTime || '--:--'}
+                      </span>
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase">
+                        {getTimezoneAbbrev(cityB.timezone)}
+                      </span>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Card Body: Digital Time (Click to focus on Globe) */}
-                  <div
-                    onClick={handleSwitchToLocationB}
-                    className="cursor-pointer group flex items-baseline justify-between"
-                    title="Click to focus 3D Earth on Location B"
-                  >
-                    <div
-                      suppressHydrationWarning
-                      className="text-xl sm:text-2xl font-light font-mono text-[#fea082] tracking-wider group-hover:brightness-125 transition-all"
+                {/* Mobile Drawer (Visible when toggled) */}
+                {isMobileDetailOpen && (
+                  <div className="p-2.5 rounded-xl bg-black/85 border border-white/10 text-[10px] space-y-1.5 backdrop-blur-md">
+                    <div className="flex justify-between items-center text-zinc-400 border-b border-white/10 pb-1">
+                      <span>{cityA.city}: <span className="text-white" suppressHydrationWarning>{timeA?.currentDate}</span></span>
+                      <span className="font-mono text-[9px]">{formatCoordinates(cityA.lat, cityA.lng)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-zinc-400 border-b border-white/10 pb-1">
+                      <span>{cityB.city}: <span className="text-white" suppressHydrationWarning>{timeB?.currentDate}</span></span>
+                      <span className="font-mono text-[9px]">{formatCoordinates(cityB.lat, cityB.lng)}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        type="button"
+                        onClick={handleOpenGoogleCalendar}
+                        className="px-2.5 py-1 rounded text-[9px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Calendar className="w-2.5 h-2.5" />
+                        <span>Google Cal</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadIcs}
+                        className="px-2.5 py-1 rounded text-[9px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-500/30 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-2.5 h-2.5" />
+                        <span>.ICS Invite</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile Bottom Bar: Difference + Details Toggle + Minimize */}
+                <div className="flex items-center justify-between text-[10px] uppercase font-light text-zinc-300 pt-1 border-t border-white/10 px-0.5">
+                  <div className="flex items-center gap-1.5 truncate">
+                    {comparison && (
+                      <>
+                        <Clock className="w-2.5 h-2.5 text-[#fea082] shrink-0" />
+                        <span className="truncate">{comparison.formattedDifference}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileDetailOpen((prev) => !prev)}
+                      className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 cursor-pointer"
                     >
-                      {timeB?.currentTime || '--:--:--'}
-                    </div>
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest hidden sm:inline">
-                      {getTimezoneAbbrev(cityB.timezone)}
-                    </span>
-                  </div>
-
-                  {/* Card Footer: Date & Coordinates */}
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-light border-t border-white/5 pt-1">
-                    <span suppressHydrationWarning>{timeB?.currentDate}</span>
-                    <span className="font-mono text-[9px]">{formatCoordinates(cityB.lat, cityB.lng)}</span>
+                      {isMobileDetailOpen ? 'Hide' : 'Details'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsDockCollapsed(true)}
+                      className="text-zinc-500 hover:text-zinc-300 p-0.5 rounded cursor-pointer"
+                      title="Minimize Dock"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
 
-              {/* Time Difference Summary Bar + 1-Click Calendar Export + Collapse Button */}
-              <div className="flex items-center justify-between pt-1.5 border-t border-white/10 text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-zinc-300 gap-2">
-                <div className="flex items-center gap-2 truncate">
-                  {comparison && (
-                    <>
-                      <Clock className="w-3 h-3 text-[#fea082] shrink-0" />
-                      <span className="truncate">{comparison.formattedDifference}</span>
-                    </>
-                  )}
+              {/* ======================================================= */}
+              {/* DESKTOP FULL DOCK (>= md)                               */}
+              {/* ======================================================= */}
+              <div className="hidden md:block space-y-2">
+                {/* Clocks & Controls Grid */}
+                <div className="grid grid-cols-11 gap-2.5 items-stretch">
+                  {/* Location A Column (5 cols) */}
+                  <div className="col-span-5 p-2.5 rounded-xl border border-white/10 bg-black/60 transition-all flex flex-col justify-between gap-1 shadow-md">
+                    {/* Card Header: Dropdown + GPS + UTC Offset */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="relative flex-1 flex items-center gap-1.5 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-[#38bdf8] shrink-0" />
+                        <div className="relative flex-1 min-w-0">
+                          <select
+                            value={cityA.id}
+                            onChange={(e) => {
+                              const found = CITIES.find((c) => c.id === e.target.value);
+                              if (found) {
+                                setCityA(found);
+                                setFocusedTarget('primary');
+                              }
+                            }}
+                            className="w-full appearance-none pr-6 text-xs font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
+                          >
+                            {REGION_GROUPS.map((group) => (
+                              <optgroup key={`dock-a-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
+                                {group.cities.map((c) => (
+                                  <option key={`da-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                                    {c.city}, {c.country}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleDetectLocation}
+                          disabled={isLocating}
+                          className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider uppercase text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-[#38bdf8] transition-all cursor-pointer flex items-center gap-1"
+                          title="Detect current location via GPS"
+                        >
+                          <Navigation className={`w-2.5 h-2.5 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
+                          <span>GPS</span>
+                        </button>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {timeA?.utcOffset}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card Body: Digital Time (Click to focus on Globe) */}
+                    <div
+                      onClick={handleSwitchToLocationA}
+                      className="cursor-pointer group flex items-baseline justify-between"
+                      title="Click to focus 3D Earth on Location A"
+                    >
+                      <div
+                        suppressHydrationWarning
+                        className="text-xl sm:text-2xl font-light font-mono text-white tracking-wider group-hover:text-[#38bdf8] transition-colors"
+                      >
+                        {timeA?.currentTime || '--:--:--'}
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest hidden sm:inline">
+                        {getTimezoneAbbrev(cityA.timezone)}
+                      </span>
+                    </div>
+
+                    {/* Card Footer: Date & Coordinates */}
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400 font-light border-t border-white/5 pt-1">
+                      <span suppressHydrationWarning>{timeA?.currentDate}</span>
+                      <span className="font-mono text-[9px]">{formatCoordinates(cityA.lat, cityA.lng)}</span>
+                    </div>
+                  </div>
+
+                  {/* Center Swap Column (1 col) */}
+                  <div className="col-span-1 flex flex-col items-center justify-center py-1">
+                    <button
+                      type="button"
+                      onClick={handleSwap}
+                      className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-[#fea082] border border-white/20 transition-all hover:rotate-180 duration-300 cursor-pointer shadow-md"
+                      title="Click to Swap Location A and Location B"
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Location B Column (5 cols) */}
+                  <div className="col-span-5 p-2.5 rounded-xl border border-white/10 bg-black/60 transition-all flex flex-col justify-between gap-1 shadow-md">
+                    {/* Card Header: Dropdown + UTC Offset */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="relative flex-1 flex items-center gap-1.5 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-[#fea082] shrink-0" />
+                        <div className="relative flex-1 min-w-0">
+                          <select
+                            value={cityB.id}
+                            onChange={(e) => {
+                              const found = CITIES.find((c) => c.id === e.target.value);
+                              if (found) {
+                                setCityB(found);
+                                setFocusedTarget('secondary');
+                              }
+                            }}
+                            className="w-full appearance-none pr-6 text-xs font-medium tracking-wider uppercase text-white bg-transparent outline-none cursor-pointer truncate"
+                          >
+                            {REGION_GROUPS.map((group) => (
+                              <optgroup key={`dock-b-${group.label}`} label={group.label} className="bg-zinc-950 text-zinc-400">
+                                {group.cities.map((c) => (
+                                  <option key={`db-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                                    {c.city}, {c.country}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                        {timeB?.utcOffset}
+                      </span>
+                    </div>
+
+                    {/* Card Body: Digital Time (Click to focus on Globe) */}
+                    <div
+                      onClick={handleSwitchToLocationB}
+                      className="cursor-pointer group flex items-baseline justify-between"
+                      title="Click to focus 3D Earth on Location B"
+                    >
+                      <div
+                        suppressHydrationWarning
+                        className="text-xl sm:text-2xl font-light font-mono text-[#fea082] tracking-wider group-hover:brightness-125 transition-all"
+                      >
+                        {timeB?.currentTime || '--:--:--'}
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest hidden sm:inline">
+                        {getTimezoneAbbrev(cityB.timezone)}
+                      </span>
+                    </div>
+
+                    {/* Card Footer: Date & Coordinates */}
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400 font-light border-t border-white/5 pt-1">
+                      <span suppressHydrationWarning>{timeB?.currentDate}</span>
+                      <span className="font-mono text-[9px]">{formatCoordinates(cityB.lat, cityB.lng)}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* 1-Click Meeting Calendar Invite Quick Buttons */}
-                  <button
-                    type="button"
-                    onClick={handleOpenGoogleCalendar}
-                    className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1"
-                    title="Add Best Overlap Meeting to Google Calendar"
-                  >
-                    <Calendar className="w-2.5 h-2.5" />
-                    <span className="hidden sm:inline">Google Cal</span>
-                  </button>
+                {/* Time Difference Summary Bar + 1-Click Calendar Export + Collapse Button */}
+                <div className="flex items-center justify-between pt-1.5 border-t border-white/10 text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-zinc-300 gap-2">
+                  <div className="flex items-center gap-2 truncate">
+                    {comparison && (
+                      <>
+                        <Clock className="w-3 h-3 text-[#fea082] shrink-0" />
+                        <span className="truncate">{comparison.formattedDifference}</span>
+                      </>
+                    )}
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={handleDownloadIcs}
-                    className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 transition-all cursor-pointer flex items-center gap-1"
-                    title="Download .ics Meeting Invite for Outlook / Apple Calendar"
-                  >
-                    <Download className="w-2.5 h-2.5" />
-                    <span className="hidden sm:inline">.ICS</span>
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {/* 1-Click Meeting Calendar Invite Quick Buttons */}
+                    <button
+                      type="button"
+                      onClick={handleOpenGoogleCalendar}
+                      className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1"
+                      title="Add Best Overlap Meeting to Google Calendar"
+                    >
+                      <Calendar className="w-2.5 h-2.5" />
+                      <span className="hidden sm:inline">Google Cal</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsDockCollapsed(true)}
-                    className="text-zinc-500 hover:text-zinc-300 p-1 rounded transition-colors cursor-pointer"
-                    title="Minimize Dock (Clean Full Globe View)"
-                  >
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadIcs}
+                      className="px-2 py-0.5 rounded text-[9px] font-mono tracking-wider text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 transition-all cursor-pointer flex items-center gap-1"
+                      title="Download .ics Meeting Invite for Outlook / Apple Calendar"
+                    >
+                      <Download className="w-2.5 h-2.5" />
+                      <span className="hidden sm:inline">.ICS</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsDockCollapsed(true)}
+                      className="text-zinc-500 hover:text-zinc-300 p-1 rounded transition-colors cursor-pointer"
+                      title="Minimize Dock"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
