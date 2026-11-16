@@ -248,4 +248,10 @@ public class MainActivity extends AppCompatActivity {
 `
 );
 
+// 9. Copy mipmap icons if available
+const srcAndroidIcons = path.resolve(process.cwd(), 'src-tauri', 'icons', 'android');
+if (fs.existsSync(srcAndroidIcons)) {
+  fs.cpSync(srcAndroidIcons, path.join(baseDir, 'app', 'src', 'main', 'res'), { recursive: true });
+}
+
 console.log('✅ Android native project generated successfully at ./android');
