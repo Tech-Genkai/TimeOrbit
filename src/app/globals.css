@@ -11,17 +11,33 @@
   --space-border: rgba(255, 255, 255, 0.12);
 }
 
+html {
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background-color: #000000;
   color: #f8fafc;
   min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 100vw;
   overflow-x: hidden;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   font-family: "Montserrat", -apple-system, BlinkMacSystemFont, sans-serif;
   background-image: 
     radial-gradient(circle at 50% 10%, rgba(20, 30, 55, 0.45), transparent 60%),
     radial-gradient(ellipse 70% 40% at 80% 30%, rgba(140, 186, 255, 0.05), transparent 50%),
     radial-gradient(circle at 20% 80%, rgba(243, 144, 65, 0.04), transparent 50%);
   background-attachment: fixed;
+}
+
+/* Ensure interactive WebGL 3D surfaces prevent browser pinch-scroll hijack */
+canvas, .touch-none {
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 /* Space-Theme Glassmorphism Classes */

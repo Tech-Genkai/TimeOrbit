@@ -244,12 +244,12 @@ export default function ComparePage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleDetectLocation}
               disabled={isLocating}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer whitespace-nowrap active:scale-95"
             >
               <Navigation className={`w-3 h-3 text-[#fea082] ${isLocating ? 'animate-spin' : ''}`} />
               <span>{isLocating ? 'Locating...' : 'Detect GPS'}</span>
@@ -258,7 +258,7 @@ export default function ComparePage() {
             <button
               type="button"
               onClick={handleSwapPrimary}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer whitespace-nowrap active:scale-95"
               title="Swap primary hubs"
             >
               <ArrowRightLeft className="w-3 h-3 text-[#fea082]" />
@@ -272,7 +272,7 @@ export default function ComparePage() {
                   const found = CITIES.find((c) => c.id === e.target.value);
                   if (found) handleAddCity(found);
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-light bg-[#fea082]/10 border border-[#fea082]/30 text-[#fea082] hover:bg-[#fea082]/20 cursor-pointer outline-none"
+                className="w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-light bg-[#fea082]/10 border border-[#fea082]/30 text-[#fea082] hover:bg-[#fea082]/20 cursor-pointer outline-none truncate"
               >
                 <option value="" disabled className="bg-zinc-900 text-zinc-400">
                   + Add City ({5 - cities.length} remaining)

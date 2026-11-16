@@ -25,7 +25,10 @@ import {
   Satellite,
   Play,
   Pause,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
+import Link from 'next/link';
 import GlobeCanvas, { GlobeCanvasHandle } from '@/components/globe/GlobeCanvas';
 import ISSPassModal from '@/components/iss/ISSPassModal';
 import { CITIES, findNearestCity, resolveUserCity } from '@/lib/cities';
@@ -112,6 +115,20 @@ export default function HomePage() {
 
   // ISS Flyover Radar Modal state
   const [isISSPassModalOpen, setIsISSPassModalOpen] = useState<boolean>(false);
+
+  // Fullscreen Observatory Clock state
+  const [isFullscreenClockOpen, setIsFullscreenClockOpen] = useState<boolean>(false);
+  const [is12HourClock, setIs12HourClock] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isFullscreenClockOpen) setIsFullscreenClockOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreenClockOpen]);
 
   const [simulatedDate, setSimulatedDate] = useState<Date | null>(null);
 
@@ -391,9 +408,9 @@ export default function HomePage() {
       {/* ============================================================ */}
       {/* 1. FULL PAGE IMMERSIVE 3D CELESTIAL STAGE (100VH VIEWPORT)   */}
       {/* ============================================================ */}
-      <section className="relative w-full h-[calc(100vh-4rem)] overflow-hidden flex flex-col justify-between">
+      <section className="relative w-full h-[calc(100dvh-3.75rem)] sm:h-[calc(100vh-4rem)] overflow-hidden flex flex-col justify-between">
         {/* Full-Page Interactive 3D Three.js Globe & Space Canvas */}
-        <div className="absolute inset-0 w-full h-full z-0">
+        <div className="absolute inset-0 w-full h-full z-0 touch-none">
           <GlobeCanvas
             ref={globeRef}
             primaryLocation={primaryLoc}
@@ -402,13 +419,13 @@ export default function HomePage() {
             onFocusChange={setFocusedTarget}
             autoRotate={isAutoRotating}
             simulatedDate={simulatedDate}
-            className="w-full h-full"
+            className="w-full h-full touch-none"
           />
         </div>
 
-        {/* --- Top Header (Clean on mobile, expanded on desktop) --- */}
-        <div className="relative z-10 w-full pt-3 px-3 sm:pt-4 sm:px-8 flex items-center justify-between pointer-events-none">
-          <div className="pointer-events-auto hidden sm:block">
+        {/* --- Top Header (Responsive on mobile, expanded on desktop) --- */}
+        <div className="relative z-10 w-full pt-2 px-2 sm:pt-4 sm:px-8 flex items-center justify-between pointer-events-none gap-2">
+          <div className="pointer-events-auto hidden sm:block shrink-0">
             <h1 className="text-base sm:text-xl font-light tracking-[0.28em] uppercase text-white drop-shadow">
               TimeOrbit Explorer
             </h1>
@@ -417,13 +434,13 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto ml-auto sm:ml-0">
+          <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto ml-auto sm:ml-0 max-w-full overflow-x-auto no-scrollbar py-0.5">
             {/* Viewport Zoom & Rotation Controls */}
-            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full border border-white/20 p-1 shadow-lg">
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-black/60 backdrop-blur-md rounded-full border border-white/20 p-1 shadow-lg shrink-0">
               <button
                 type="button"
                 onClick={() => globeRef.current?.zoomIn()}
-                className="p-1.5 rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                className="p-1 sm:p-1.5 rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
                 title="Zoom In (+)"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
@@ -431,7 +448,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => globeRef.current?.zoomOut()}
-                className="p-1.5 rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                className="p-1 sm:p-1.5 rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
                 title="Zoom Out (-)"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
@@ -439,7 +456,7 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => setIsAutoRotating((prev) => !prev)}
-                className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                className={`p-1 sm:p-1.5 rounded-full transition-all cursor-pointer ${
                   isAutoRotating ? 'text-[#fea082] bg-white/10' : 'text-zinc-400 hover:text-white hover:bg-white/10'
                 }`}
                 title="Toggle Earth Auto-Rotation"
@@ -448,11 +465,22 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* Fullscreen Clock Button */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreenClockOpen(true)}
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#fea082] backdrop-blur-md transition-all cursor-pointer shadow-lg shrink-0"
+              title="Open Fullscreen Observatory Clock"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-[#fea082]" />
+              <span className="hidden sm:inline">Clock Mode</span>
+            </button>
+
             {/* Time Travel Simulation Toggle */}
             <button
               type="button"
               onClick={() => setIsTimeTravelOpen((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-light tracking-[0.16em] uppercase transition-all cursor-pointer backdrop-blur-md shadow-lg ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase transition-all cursor-pointer backdrop-blur-md shadow-lg shrink-0 ${
                 isTimeTravelOpen || timeTravelMinutes !== 0 || isPlayingTimeTravel
                   ? 'bg-[#fea082]/20 border border-[#fea082] text-white shadow-[0_0_12px_rgba(254,160,130,0.3)]'
                   : 'bg-black/60 hover:bg-black/80 border border-white/20 text-zinc-300 hover:text-white'
@@ -470,20 +498,20 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setIsISSPassModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-light tracking-[0.16em] uppercase text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-sky-400 backdrop-blur-md transition-all cursor-pointer shadow-lg"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-sky-400 backdrop-blur-md transition-all cursor-pointer shadow-lg shrink-0"
               title="Predict ISS Flyover Passes"
             >
               <Satellite className="w-3.5 h-3.5 text-[#38bdf8]" />
-              <span className="hidden sm:inline">ISS Radar</span>
+              <span className="hidden sm:inline">ISS</span>
             </button>
 
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-light tracking-[0.16em] uppercase text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#fea082] backdrop-blur-md transition-all cursor-pointer shadow-lg"
+              className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#fea082] backdrop-blur-md transition-all cursor-pointer shadow-lg shrink-0"
+              title="Open Celestial Telemetry Drawer"
             >
               <Compass className="w-3.5 h-3.5 text-[#fea082]" />
-              <span className="hidden sm:inline">Celestial Telemetry</span>
-              <span className="sm:hidden">Data</span>
+              <span className="hidden sm:inline">Telemetry</span>
             </button>
           </div>
         </div>
@@ -1925,6 +1953,106 @@ export default function HomePage() {
         onClose={() => setIsISSPassModalOpen(false)}
         city={cityA}
       />
+
+      {/* ============================================================ */}
+      {/* FULLSCREEN OBSERVATORY CLOCK OVERLAY                          */}
+      {/* ============================================================ */}
+      {isFullscreenClockOpen && (
+        <div className="fixed inset-0 z-[100] w-screen h-[100dvh] bg-[#05070d]/95 backdrop-blur-3xl flex flex-col justify-between p-4 sm:p-8 select-none animate-in fade-in overflow-y-auto">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#fea082] animate-pulse" />
+              <span className="text-xs sm:text-sm font-light tracking-[0.25em] uppercase text-white">
+                Fullscreen Observatory Clock
+              </span>
+              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[9px] font-mono tracking-widest uppercase bg-white/10 border border-white/15 text-zinc-300">
+                {cityA.city}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIs12HourClock((prev) => !prev)}
+                className="px-2.5 py-1 rounded-lg text-xs font-mono uppercase tracking-wider bg-white/5 hover:bg-white/15 border border-white/15 text-zinc-300 hover:text-white transition-all cursor-pointer"
+              >
+                {is12HourClock ? '12H' : '24H'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsFullscreenClockOpen(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Exit Fullscreen Clock (Esc)"
+              >
+                <Minimize2 className="w-4 h-4 text-[#fea082]" />
+                <span className="text-xs font-mono hidden sm:inline">Exit Fullscreen</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Central Giant Chronometer Display */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center py-6 sm:py-10 space-y-4">
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-[0.2em] uppercase text-[#fea082]">
+              <span className="w-2 h-2 rounded-full bg-[#38bdf8]" />
+              <span>{cityA.city}, {cityA.country}</span>
+              <span className="text-zinc-400 font-mono">({timeA?.utcOffset})</span>
+            </div>
+
+            {/* Giant Digits */}
+            <div className="flex items-baseline justify-center gap-1 sm:gap-3 text-white max-w-full overflow-hidden">
+              <span className="text-5xl xs:text-6xl sm:text-8xl md:text-9xl font-extralight font-mono tracking-tight drop-shadow-[0_0_40px_rgba(254,160,130,0.3)]">
+                {timeA?.currentTime ? (
+                  is12HourClock
+                    ? (() => {
+                        const parts = timeA.currentTime.split(':');
+                        let h = parseInt(parts[0], 10);
+                        const ampm = h >= 12 ? 'PM' : 'AM';
+                        h = h % 12 || 12;
+                        return `${h.toString().padStart(2, '0')}:${parts[1]}:${parts[2]?.slice(0, 2) || '00'} ${ampm}`;
+                      })()
+                    : timeA.currentTime
+                ) : '--:--:--'}
+              </span>
+            </div>
+
+            <div className="text-xs sm:text-base font-light font-mono text-zinc-400 tracking-wider">
+              {timeA?.currentDate}
+            </div>
+
+            {/* Dual Clock Alignment Preview */}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-4 bg-white/[0.03] border border-white/10 rounded-2xl px-4 py-3 backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#fea082]" />
+                <span className="text-xs font-mono uppercase tracking-wider text-zinc-300">{cityB.city}:</span>
+                <span className="text-xs font-mono font-medium text-[#fea082]">{timeB?.currentTime}</span>
+              </div>
+              {comparison && (
+                <div className="text-[11px] font-mono text-zinc-400 border-l border-white/10 pl-4">
+                  Difference: <strong className="text-white">{comparison.formattedDifference}</strong>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-zinc-400 border-t border-white/10 pt-3">
+            <div className="flex items-center gap-4">
+              <span>Sun Altitude: <strong className="text-white">{activeShadow.altitudeDeg}°</strong></span>
+              <span>Coordinates: <strong className="text-[#38bdf8]">{formatCoordinates(cityA.lat, cityA.lng)}</strong></span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/clock"
+                className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-white/15 text-zinc-200 hover:text-white transition-all text-xs"
+              >
+                Open Full Chronometer Studio →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -574,6 +574,8 @@ export interface ISSPosition {
   speedKms: number;
   orbitalPeriodMinutes: number;
   footprintRadiusKm: number;
+  isLiveConfirmed?: boolean;
+  source?: string;
 }
 
 /**

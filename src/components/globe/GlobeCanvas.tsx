@@ -446,6 +446,12 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
     rendererRef.current = renderer;
+    renderer.domElement.style.touchAction = 'none';
+    renderer.domElement.style.userSelect = 'none';
+    renderer.domElement.style.webkitUserSelect = 'none';
+    container.style.touchAction = 'none';
+    container.style.userSelect = 'none';
+    container.style.webkitUserSelect = 'none';
     container.appendChild(renderer.domElement);
 
     // --- Starfield in Space (Deep Space Stars) ---
@@ -820,6 +826,72 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     };
     container.addEventListener('wheel', handleWheel, { passive: false });
 
+    // --- Native Touch Gestures for Smooth Mobile Orbiting & Pinch-Zoom ---
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchPinchDist: number | null = null;
+    let isTouchDragging = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        isTouchDragging = true;
+        isDraggingRef.current = true;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchPinchDist = null;
+      } else if (e.touches.length === 2) {
+        isTouchDragging = false;
+        isDraggingRef.current = false;
+        touchPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.cancelable) {
+        e.preventDefault(); // Prevents mobile browser page scrolling
+      }
+
+      if (e.touches.length === 2 && touchPinchDist !== null) {
+        const currentDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const delta = currentDist - touchPinchDist;
+        targetDistRef.current = Math.max(3.2, Math.min(8.5, targetDistRef.current - delta * 0.015));
+        touchPinchDist = currentDist;
+      } else if (e.touches.length === 1 && isTouchDragging) {
+        const deltaX = e.touches[0].clientX - touchStartX;
+        const deltaY = e.touches[0].clientY - touchStartY;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+
+        targetLngRef.current -= deltaX * 0.42;
+        targetLatRef.current = Math.max(-75, Math.min(75, targetLatRef.current + deltaY * 0.32));
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) {
+        isTouchDragging = false;
+        isDraggingRef.current = false;
+        touchPinchDist = null;
+      } else if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        isTouchDragging = true;
+        isDraggingRef.current = true;
+        touchPinchDist = null;
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: false });
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
     // --- Animation & Render Loop ---
     let animationFrameId: number;
     const animate = () => {
@@ -889,6 +961,10 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
       container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
       renderer.dispose();
       if (container && renderer.domElement) {
         container.removeChild(renderer.domElement);
@@ -984,6 +1060,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
 
   // Multi-Touch & Pointer drag to orbit camera and pinch-to-zoom
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return; // Handled smoothly by native TouchEvent listeners
     activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
 
     if (activePointersRef.current.size === 1) {
@@ -1048,7 +1125,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
   };
 
   return (
-    <div className={`relative w-full h-full flex flex-col items-center justify-center select-none overflow-hidden ${className}`}>
+    <div className={`relative w-full h-full flex flex-col items-center justify-center select-none overflow-hidden touch-none ${className}`}>
       {/* Three.js Canvas Mount */}
       <div
         ref={mountRef}
@@ -1058,7 +1135,8 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
         onPointerCancel={() => {
           isDraggingRef.current = false;
         }}
-        className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
+        style={{ touchAction: 'none' }}
+        className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-none select-none"
       />
     </div>
   );
