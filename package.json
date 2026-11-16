@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --loader ./tests/test-loader.mjs tests/run-all-tests.mjs"
+    "test": "node --loader ./tests/test-loader.mjs tests/run-all-tests.mjs",
+    "tauri": "tauri"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -24,6 +25,8 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/turbopack": "^4",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/canvas-confetti": "^1.9.0",
     "@types/jsonwebtoken": "^9.0.9",
