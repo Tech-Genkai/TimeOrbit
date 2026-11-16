@@ -38,6 +38,16 @@ include ':app'
 `
 );
 
+// 2b. gradle.properties
+fs.writeFileSync(
+  path.join(baseDir, 'gradle.properties'),
+  `org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+android.enableJetifier=true
+android.nonTransitiveRClass=true
+`
+);
+
 // 3. Root build.gradle
 fs.writeFileSync(
   path.join(baseDir, 'build.gradle'),
