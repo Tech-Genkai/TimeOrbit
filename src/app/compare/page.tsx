@@ -1,21 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Clock,
   ArrowRightLeft,
   Zap,
-  MapPin,
   Sliders,
   Navigation,
   Sun,
   Moon,
   Sunrise,
   Sunset,
+  Trash2,
+  Calendar,
+  Users,
 } from 'lucide-react';
 import { CITIES, resolveUserCity, findNearestCity } from '@/lib/cities';
-import { getCityTime, compareCities } from '@/lib/timeEngine';
-import { CityData, TimeDetail, ComparisonResult } from '@/types';
+import { getCityTime, compareCities, compareMultiCities, generateCalendarMeetingLinks } from '@/lib/timeEngine';
+import { CityData, TimeDetail, ComparisonResult, MultiCityComparisonResult } from '@/types';
+import { useToast } from '@/context/ToastContext';
 
 const REGION_GROUPS = [
   { label: 'Asia & South Asia', cities: CITIES.filter((c) => c.timezone.startsWith('Asia/')) },
@@ -46,16 +49,22 @@ const REGION_GROUPS = [
 ];
 
 export default function ComparePage() {
-  const [cityA, setCityA] = useState<CityData>(CITIES[0]); // Tokyo or auto-detected
-  const [cityB, setCityB] = useState<CityData>(CITIES[47] || CITIES[13]); // London
-  const [timeA, setTimeA] = useState<TimeDetail | null>(null);
-  const [timeB, setTimeB] = useState<TimeDetail | null>(null);
+  const toast = useToast();
+  const [cities, setCities] = useState<CityData[]>([
+    CITIES[0], // Tokyo
+    CITIES[47] || CITIES[13], // London
+  ]);
+
+  const [cityTimes, setCityTimes] = useState<TimeDetail[]>([]);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [multiComparison, setMultiComparison] = useState<MultiCityComparisonResult | null>(null);
   const [scrubberHour, setScrubberHour] = useState<number>(12);
 
   const [isLocating, setIsLocating] = useState(false);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
+  const [copiedCalendar, setCopiedCalendar] = useState(false);
 
+  // Auto-detect user's primary timezone on mount
   useEffect(() => {
     queueMicrotask(() => {
       setScrubberHour(new Date().getHours());
@@ -65,7 +74,7 @@ export default function ComparePage() {
       const matched = resolveUserCity(userTz);
       if (matched) {
         queueMicrotask(() => {
-          setCityA(matched);
+          setCities((prev) => [matched, prev[1] || CITIES[13]]);
         });
       }
     } catch (e) {
@@ -73,18 +82,23 @@ export default function ComparePage() {
     }
   }, []);
 
+  // Synchronize clocks and multi-city comparison
   useEffect(() => {
     const update = () => {
       const now = new Date();
-      setTimeA(getCityTime(cityA, now));
-      setTimeB(getCityTime(cityB, now));
-      setComparison(compareCities(cityA, cityB, now));
+      const times = cities.map((c) => getCityTime(c, now));
+      setCityTimes(times);
+
+      if (cities.length >= 2) {
+        setComparison(compareCities(cities[0], cities[1], now));
+        setMultiComparison(compareMultiCities(cities, now));
+      }
     };
 
     queueMicrotask(update);
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [cityA, cityB]);
+  }, [cities]);
 
   const handleDetectLocation = () => {
     setIsLocating(true);
@@ -92,7 +106,7 @@ export default function ComparePage() {
 
     if (typeof window === 'undefined' || !navigator.geolocation) {
       const fallback = resolveUserCity();
-      setCityA(fallback);
+      setCities((prev) => [fallback, ...prev.slice(1)]);
       setLocationStatus(`Timezone matched: ${fallback.city}, ${fallback.country}`);
       setIsLocating(false);
       return;
@@ -102,15 +116,16 @@ export default function ComparePage() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         const nearest = findNearestCity(latitude, longitude);
-        setCityA(nearest);
+        setCities((prev) => [nearest, ...prev.slice(1)]);
         setLocationStatus(`Located: ${nearest.city}, ${nearest.country} (${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°)`);
         setIsLocating(false);
+        toast.success(`Primary hub set to ${nearest.city}, ${nearest.country}`, 'GPS Location Fixed');
         setTimeout(() => setLocationStatus(null), 8000);
       },
       (err) => {
         console.warn('Geolocation denied:', err.message);
         const fallback = resolveUserCity();
-        setCityA(fallback);
+        setCities((prev) => [fallback, ...prev.slice(1)]);
         setLocationStatus(`Using closest timezone hub: ${fallback.city}, ${fallback.country}`);
         setIsLocating(false);
         setTimeout(() => setLocationStatus(null), 8000);
@@ -119,10 +134,28 @@ export default function ComparePage() {
     );
   };
 
-  const handleSwap = () => {
-    const temp = cityA;
-    setCityA(cityB);
-    setCityB(temp);
+  const handleSwapPrimary = () => {
+    if (cities.length < 2) return;
+    setCities((prev) => [prev[1], prev[0], ...prev.slice(2)]);
+  };
+
+  const handleAddCity = (cityToAdd: CityData) => {
+    if (cities.length >= 5) return;
+    if (cities.some((c) => c.id === cityToAdd.id)) return;
+    setCities((prev) => [...prev, cityToAdd]);
+  };
+
+  const handleRemoveCity = (index: number) => {
+    if (cities.length <= 2) return;
+    setCities((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateCity = (index: number, newCity: CityData) => {
+    setCities((prev) => {
+      const copy = [...prev];
+      copy[index] = newCity;
+      return copy;
+    });
   };
 
   const renderSolarBadge = (state?: 'day' | 'night' | 'dawn' | 'dusk') => {
@@ -174,18 +207,20 @@ export default function ComparePage() {
     return new Date(targetUtcMs);
   };
 
-  const getDayOffset = (timestamp: Date, city1: CityData, city2: CityData): number => {
-    const day1 = new Intl.DateTimeFormat('en-CA', { timeZone: city1.timezone }).format(timestamp);
-    const day2 = new Intl.DateTimeFormat('en-CA', { timeZone: city2.timezone }).format(timestamp);
-    return Math.round(
-      (new Date(day2 + 'T00:00:00Z').getTime() - new Date(day1 + 'T00:00:00Z').getTime()) / 86400000
-    );
-  };
+  const scrubberTargetTimestamp = calculateScrubberTimestamp(cities[0], scrubberHour);
+  const scrubbedTimes = useMemo(() => {
+    return cities.map((c) => getCityTime(c, scrubberTargetTimestamp));
+  }, [cities, scrubberTargetTimestamp]);
 
-  const scrubberTargetTimestamp = calculateScrubberTimestamp(cityA, scrubberHour);
-  const scrubbedTimeA = getCityTime(cityA, scrubberTargetTimestamp);
-  const scrubbedTimeB = getCityTime(cityB, scrubberTargetTimestamp);
-  const scrubberDayOffset = getDayOffset(scrubberTargetTimestamp, cityA, cityB);
+  const handleExportGoldenMeeting = () => {
+    if (!comparison) return;
+    const bestHour = multiComparison?.goldenHour.bestUtcHour ?? 14;
+    const cal = generateCalendarMeetingLinks(cities[0], cities[1], bestHour);
+    window.open(cal.googleCalendarUrl, '_blank', 'noopener,noreferrer');
+    setCopiedCalendar(true);
+    toast.celestial('Google Calendar scheduling link created & opened.', 'Call Scheduled');
+    setTimeout(() => setCopiedCalendar(false), 2500);
+  };
 
   return (
     <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full space-y-8">
@@ -195,88 +230,110 @@ export default function ComparePage() {
           Comparison Studio
         </h1>
         <p className="text-xs sm:text-sm font-light tracking-[0.2em] uppercase text-[#fea082]">
-          Synchronized Planetary Coordinates
+          Multi-City Planetary Alignment & Golden Window Finder
         </p>
       </div>
 
       {/* Selectors Bar */}
-      <div className="glass-panel rounded-2xl p-6 border border-white/10 flex flex-col space-y-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="w-full sm:flex-1 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-light tracking-wider uppercase text-zinc-300 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-[#fea082]" /> Base Hub
-              </span>
-              <button
-                type="button"
-                onClick={handleDetectLocation}
-                disabled={isLocating}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer"
-              >
-                <Navigation className={`w-3 h-3 text-[#fea082] ${isLocating ? 'animate-spin' : ''}`} />
-                <span>{isLocating ? 'Locating...' : 'Detect GPS'}</span>
-              </button>
-            </div>
-
-            <select
-              value={cityA.id}
-              onChange={(e) => {
-                const c = CITIES.find((x) => x.id === e.target.value);
-                if (c) setCityA(c);
-              }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-white/15 text-xs font-light bg-black/80 text-white focus:border-[#fea082] outline-none"
-            >
-              {REGION_GROUPS.map((group) => (
-                <optgroup
-                  key={`cmp-grp-a-${group.label}`}
-                  label={group.label}
-                  className="bg-zinc-900 text-zinc-400 font-normal uppercase tracking-wider text-[11px]"
-                >
-                  {group.cities.map((c) => (
-                    <option key={`cmp-a-${c.id}`} value={c.id} className="text-white">
-                      {c.city}, {c.country} ({c.timezone})
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          <button
-            onClick={handleSwap}
-            title="Swap cities"
-            className="p-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/15 text-zinc-300 transition-all hover:rotate-180 duration-300 sm:mt-5 cursor-pointer"
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-          </button>
-
-          <div className="w-full sm:flex-1 space-y-1">
-            <span className="text-xs font-light tracking-wider uppercase text-zinc-300 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-[#fea082]" /> Target Hub
+      <div className="glass-panel rounded-2xl p-5 sm:p-6 border border-white/10 flex flex-col space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#fea082]" />
+            <span className="text-xs font-light tracking-wider uppercase text-white">
+              Comparing {cities.length} of 5 Global Cities
             </span>
-            <select
-              value={cityB.id}
-              onChange={(e) => {
-                const c = CITIES.find((x) => x.id === e.target.value);
-                if (c) setCityB(c);
-              }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-white/15 text-xs font-light bg-black/80 text-white focus:border-[#fea082] outline-none"
-            >
-              {REGION_GROUPS.map((group) => (
-                <optgroup
-                  key={`cmp-grp-b-${group.label}`}
-                  label={group.label}
-                  className="bg-zinc-900 text-zinc-400 font-normal uppercase tracking-wider text-[11px]"
-                >
-                  {group.cities.map((c) => (
-                    <option key={`cmp-b-${c.id}`} value={c.id} className="text-white">
-                      {c.city}, {c.country} ({c.timezone})
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDetectLocation}
+              disabled={isLocating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer"
+            >
+              <Navigation className={`w-3 h-3 text-[#fea082] ${isLocating ? 'animate-spin' : ''}`} />
+              <span>{isLocating ? 'Locating...' : 'Detect GPS'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSwapPrimary}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer"
+              title="Swap primary hubs"
+            >
+              <ArrowRightLeft className="w-3 h-3 text-[#fea082]" />
+              <span>Swap 1 ⇄ 2</span>
+            </button>
+
+            {cities.length < 5 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  const found = CITIES.find((c) => c.id === e.target.value);
+                  if (found) handleAddCity(found);
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-light bg-[#fea082]/10 border border-[#fea082]/30 text-[#fea082] hover:bg-[#fea082]/20 cursor-pointer outline-none"
+              >
+                <option value="" disabled className="bg-zinc-900 text-zinc-400">
+                  + Add City ({5 - cities.length} remaining)
+                </option>
+                {REGION_GROUPS.map((group) => (
+                  <optgroup key={`add-${group.label}`} label={group.label} className="bg-zinc-900 text-zinc-400 font-normal">
+                    {group.cities
+                      .filter((c) => !cities.some((x) => x.id === c.id))
+                      .map((c) => (
+                        <option key={`opt-add-${c.id}`} value={c.id} className="text-white">
+                          {c.city}, {c.country}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+
+        {/* City Selectors Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {cities.map((city, idx) => (
+            <div
+              key={`city-sel-${city.id}-${idx}`}
+              className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-2"
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-xs font-mono text-zinc-500 w-5">#{idx + 1}</span>
+                <select
+                  value={city.id}
+                  onChange={(e) => {
+                    const found = CITIES.find((c) => c.id === e.target.value);
+                    if (found) handleUpdateCity(idx, found);
+                  }}
+                  className="w-full appearance-none pr-4 text-xs font-light text-white bg-transparent outline-none cursor-pointer truncate"
+                >
+                  {REGION_GROUPS.map((group) => (
+                    <optgroup key={`cg-${idx}-${group.label}`} label={group.label} className="bg-zinc-900 text-zinc-400">
+                      {group.cities.map((c) => (
+                        <option key={`co-${idx}-${c.id}`} value={c.id} className="text-white bg-zinc-900">
+                          {c.city}, {c.country}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {cities.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveCity(idx)}
+                  className="p-1 text-zinc-500 hover:text-rose-400 rounded hover:bg-white/5 transition-colors"
+                  title="Remove this city"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
         </div>
 
         {locationStatus && (
@@ -287,105 +344,108 @@ export default function ComparePage() {
         )}
       </div>
 
-      {/* Clocks & Difference Hero */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* City A Card */}
-        <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-light tracking-[0.15em] text-white uppercase text-base">{cityA.city}</h3>
-              <p className="text-xs text-zinc-400 font-light">{cityA.country}</p>
+      {/* Golden Window Meeting Finder Highlight Banner */}
+      {multiComparison && (
+        <div className="glass-panel rounded-2xl p-6 border border-[#fea082]/30 bg-black/80 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#fea082]/10 border border-[#fea082]/30 flex items-center justify-center text-[#fea082]">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-[#fea082]">
+                  Golden Window Alignment Analysis
+                </span>
+                <h3 className="text-sm sm:text-base font-light text-white">
+                  {multiComparison.goldenHour.hasOverlap
+                    ? `★ Universal Overlap: ${multiComparison.goldenHour.overlapHoursCount} Shared Business Hours`
+                    : 'Optimal Alignment Window (Maximum Availability)'}
+                </h3>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {renderSolarBadge(timeA?.solarState)}
-              <span className="px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-xs text-zinc-300 font-mono">
-                {timeA?.utcOffset}
-              </span>
-            </div>
+
+            <button
+              onClick={handleExportGoldenMeeting}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs uppercase tracking-wider text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <Calendar className="w-3.5 h-3.5 text-[#fea082]" />
+              <span>{copiedCalendar ? 'Opened Calendar' : 'Schedule Team Call'}</span>
+            </button>
           </div>
 
-          <div
-            suppressHydrationWarning
-            className="text-4xl font-light text-white font-mono tracking-wider py-2"
-          >
-            {timeA?.currentTime || '--:--:--'}
-          </div>
-
-          <div className="space-y-1 text-xs text-zinc-400 border-t border-white/10 pt-3 font-light">
-            <div className="flex justify-between">
-              <span>Timezone:</span>
-              <span className="text-white font-mono">{cityA.timezone}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Coordinates:</span>
-              <span className="text-white font-mono">
-                {cityA.lat.toFixed(2)}°, {cityA.lng.toFixed(2)}°
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Daylight Saving:</span>
-              <span suppressHydrationWarning className="text-white font-mono">
-                {timeA?.isDST ? 'Active (DST)' : 'Standard Time'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* City B Card */}
-        <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-light tracking-[0.15em] text-white uppercase text-base">{cityB.city}</h3>
-              <p className="text-xs text-zinc-400 font-light">{cityB.country}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {renderSolarBadge(timeB?.solarState)}
-              <span suppressHydrationWarning className="px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-xs text-[#fea082] font-mono">
-                {timeB?.utcOffset}
-              </span>
-            </div>
-          </div>
-
-          <div
-            suppressHydrationWarning
-            className="text-4xl font-light text-[#fea082] font-mono tracking-wider py-2"
-          >
-            {timeB?.currentTime || '--:--:--'}
-          </div>
-
-          <div className="space-y-1 text-xs text-zinc-400 border-t border-white/10 pt-3 font-light">
-            <div className="flex justify-between">
-              <span>Timezone:</span>
-              <span className="text-white font-mono">{cityB.timezone}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Coordinates:</span>
-              <span className="text-white font-mono">
-                {cityB.lat.toFixed(2)}°, {cityB.lng.toFixed(2)}°
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Daylight Saving:</span>
-              <span suppressHydrationWarning className="text-white font-mono">
-                {timeB?.isDST ? 'Active (DST)' : 'Standard Time'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dynamic Summary Bar */}
-      {comparison && (
-        <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-2">
-          <div suppressHydrationWarning className="flex items-center gap-2 text-sm font-light tracking-wider uppercase text-white">
-            <Clock className="w-4 h-4 text-[#fea082]" />
-            <span>{comparison.formattedDifference}</span>
-          </div>
           <p className="text-xs text-zinc-400 font-light leading-relaxed">
-            {comparison.workingHoursOverlap.advice}
+            {multiComparison.goldenHour.advice}
           </p>
         </div>
       )}
+
+      {/* Clocks Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {cities.map((city, idx) => {
+          const detail = cityTimes[idx];
+          const isPrimary = idx === 0;
+
+          return (
+            <div
+              key={`clock-card-${city.id}`}
+              className={`glass-panel rounded-2xl p-5 border space-y-3 transition-all ${
+                isPrimary ? 'border-[#38bdf8]/40 bg-sky-950/10' : 'border-white/10 bg-black/60'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isPrimary ? 'bg-[#38bdf8] shadow-[0_0_8px_#38bdf8]' : 'bg-[#fea082]'
+                      }`}
+                    />
+                    <h3 className="font-light tracking-[0.15em] text-white uppercase text-sm sm:text-base">
+                      {city.city}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-zinc-400 font-light mt-0.5">{city.country}</p>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {renderSolarBadge(detail?.solarState)}
+                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-xs text-zinc-300 font-mono">
+                    {detail?.utcOffset}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                suppressHydrationWarning
+                className={`text-3xl sm:text-4xl font-light font-mono tracking-wider py-1 ${
+                  isPrimary ? 'text-white' : 'text-[#fea082]'
+                }`}
+              >
+                {detail?.currentTime || '--:--:--'}
+              </div>
+
+              <div className="space-y-1 text-xs text-zinc-400 border-t border-white/10 pt-2.5 font-light">
+                <div className="flex justify-between">
+                  <span>Timezone:</span>
+                  <span className="text-white font-mono">{city.timezone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Coordinates:</span>
+                  <span className="text-white font-mono">
+                    {city.lat.toFixed(2)}°, {city.lng.toFixed(2)}°
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Daylight Saving:</span>
+                  <span suppressHydrationWarning className="text-white font-mono">
+                    {detail?.isDST ? 'Active (DST)' : 'Standard'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* Interactive 24-Hour Scrubber */}
       <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-6">
@@ -393,7 +453,7 @@ export default function ComparePage() {
           <div>
             <h2 className="text-sm font-light tracking-[0.2em] uppercase text-white flex items-center gap-2">
               <Sliders className="w-4 h-4 text-[#fea082]" />
-              <span>Interactive 24-Hour Scrubber</span>
+              <span>Interactive Multi-City 24-Hour Scrubber</span>
             </h2>
           </div>
           <button
@@ -425,78 +485,105 @@ export default function ComparePage() {
         </div>
 
         {/* Scrubbed Clocks Result */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-black/40 rounded-xl p-4 border border-white/10">
-          <div className="space-y-1">
-            <span className="text-xs text-white font-light uppercase tracking-wider">{cityA.city}</span>
-            <div suppressHydrationWarning className="text-2xl font-light font-mono text-white">
-              {scrubbedTimeA.currentTime}
-            </div>
-            <p suppressHydrationWarning className="text-[11px] text-zinc-400 font-light">
-              {scrubbedTimeA.currentDate}
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-xs text-[#fea082] font-light uppercase tracking-wider">{cityB.city}</span>
-            <div suppressHydrationWarning className="text-2xl font-light font-mono text-[#fea082]">
-              {scrubbedTimeB.currentTime}
-            </div>
-            <p suppressHydrationWarning className="text-[11px] text-zinc-400 font-light">
-              {scrubbedTimeB.currentDate}
-              {scrubberDayOffset !== 0 && (
-                <span className="ml-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-zinc-300 border border-white/10">
-                  {scrubberDayOffset > 0 ? `+${scrubberDayOffset}d` : `${scrubberDayOffset}d`}
-                </span>
-              )}
-            </p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-black/40 rounded-xl p-4 border border-white/10">
+          {cities.map((city, idx) => {
+            const scrubbed = scrubbedTimes[idx];
+            return (
+              <div key={`scrub-${city.id}`} className="space-y-1 p-2 rounded-lg bg-white/[0.02]">
+                <span className="text-xs text-white font-light uppercase tracking-wider">{city.city}</span>
+                <div suppressHydrationWarning className="text-xl sm:text-2xl font-light font-mono text-[#fea082]">
+                  {scrubbed?.currentTime}
+                </div>
+                <p suppressHydrationWarning className="text-[11px] text-zinc-400 font-light">
+                  {scrubbed?.currentDate}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* 24-Hour Hour-by-Hour Cross Mapping Matrix */}
-      {comparison && (
+      {/* Unified 24-Hour Multi-City Cross Mapping Matrix */}
+      {multiComparison && (
         <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h2 className="text-xs font-light tracking-[0.2em] uppercase text-white flex items-center gap-2">
               <Zap className="w-4 h-4 text-[#fea082]" />
-              <span>Full 24-Hour Matrix</span>
+              <span>Full 24-Hour Unified Alignment Grid</span>
             </h2>
+            <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-400">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded bg-emerald-500/30 border border-emerald-400/50" /> Working (9-18)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded bg-amber-500/20 border border-amber-400/40" /> Waking (8-22)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded bg-zinc-800/80 border border-zinc-700" /> Sleeping
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-light">
               <thead>
                 <tr className="border-b border-white/10 text-zinc-400 font-mono text-[11px]">
-                  <th className="py-2.5 px-3">Hour</th>
-                  <th className="py-2.5 px-3 text-white uppercase">{cityA.city}</th>
-                  <th className="py-2.5 px-3 text-[#fea082] uppercase">{cityB.city}</th>
-                  <th className="py-2.5 px-3">Window</th>
+                  <th className="py-2.5 px-3">UTC Hour</th>
+                  {cities.map((c) => (
+                    <th key={`th-${c.id}`} className="py-2.5 px-3 uppercase text-white">
+                      {c.city}
+                    </th>
+                  ))}
+                  <th className="py-2.5 px-3">Team Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {comparison.timeline24h.map((slot) => (
-                  <tr
-                    key={`slot-${slot.hourFrom}`}
-                    className={`transition-colors ${
-                      slot.isWorkingOverlap
-                        ? 'bg-white/5'
-                        : 'hover:bg-white/5'
-                    }`}
-                  >
-                    <td className="py-2 px-3 font-mono text-zinc-500">{slot.hourFrom}:00</td>
-                    <td className="py-2 px-3 text-white font-mono">{slot.timeFromFormatted}</td>
-                    <td className="py-2 px-3 text-[#fea082] font-mono">{slot.timeToFormatted}</td>
-                    <td className="py-2 px-3">
-                      {slot.isWorkingOverlap ? (
-                        <span className="text-[10px] font-mono uppercase text-white">
-                          ● Work Overlap
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-zinc-600 font-mono">Off-Hours</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {multiComparison.timeline24h.map((slot) => {
+                  return (
+                    <tr
+                      key={`slot-${slot.utcHour}`}
+                      className={`transition-colors ${
+                        slot.isAllWorking
+                          ? 'bg-emerald-950/20'
+                          : slot.isAllAwake
+                          ? 'bg-white/[0.03]'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
+                      <td className="py-2 px-3 font-mono text-zinc-400 font-light">
+                        {slot.utcFormatted}
+                      </td>
+
+                      {slot.cityStatuses.map((st, i) => (
+                        <td key={`st-${i}-${slot.utcHour}`} className="py-2 px-3 font-mono">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] inline-block ${
+                              st.state === 'working'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : st.state === 'extended'
+                                ? 'bg-amber-500/15 text-amber-200 border border-amber-500/20'
+                                : 'text-zinc-600'
+                            }`}
+                          >
+                            {st.localFormatted}
+                          </span>
+                        </td>
+                      ))}
+
+                      <td className="py-2 px-3">
+                        {slot.isAllWorking ? (
+                          <span className="text-[10px] font-mono uppercase text-emerald-300 font-medium">
+                            ★ Universal Overlap
+                          </span>
+                        ) : slot.isAllAwake ? (
+                          <span className="text-[10px] text-zinc-400 font-mono">All Awake</span>
+                        ) : (
+                          <span className="text-[10px] text-zinc-700 font-mono">Off-Hours</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

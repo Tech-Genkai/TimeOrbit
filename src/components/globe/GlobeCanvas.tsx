@@ -24,6 +24,7 @@ interface GlobeCanvasProps {
   focusedTarget?: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth' | 'iss';
   onFocusChange?: (target: 'primary' | 'secondary' | 'sun' | 'moon' | 'earth' | 'iss') => void;
   className?: string;
+  simulatedDate?: Date | null;
 }
 
 // Convert geographic coordinates (lat, lng) to 3D Cartesian vector
@@ -273,6 +274,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     autoRotate = false,
     focusedTarget = 'earth',
     className = '',
+    simulatedDate = null,
   }: GlobeCanvasProps,
   ref
 ) {
@@ -438,9 +440,9 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     camera.position.set(0, 0, defaultDist);
     cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.75));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
     rendererRef.current = renderer;
@@ -823,6 +825,11 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
+      // Battery saver: Skip WebGL rendering passes when tab is in background
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
       currentLatRef.current += (targetLatRef.current - currentLatRef.current) * 0.07;
       currentLngRef.current += (targetLngRef.current - currentLngRef.current) * 0.07;
       currentDistRef.current += (targetDistRef.current - currentDistRef.current) * 0.08;
@@ -889,10 +896,10 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     };
   }, []);
 
-  // 2. Synchronize Real-Time Sun, Moon & Location Positions
+  // 2. Synchronize Real-Time or Simulated Sun, Moon & Location Positions
   useEffect(() => {
     const updatePositions = () => {
-      const now = new Date();
+      const now = simulatedDate || new Date();
       const sun = getSubsolarPoint(now);
       const moon = getSublunarPoint(now);
 
@@ -973,7 +980,7 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     updatePositions();
     const interval = setInterval(updatePositions, 3000);
     return () => clearInterval(interval);
-  }, [primaryLocation.lat, primaryLocation.lng, secondaryLocation.lat, secondaryLocation.lng]);
+  }, [primaryLocation.lat, primaryLocation.lng, secondaryLocation.lat, secondaryLocation.lng, simulatedDate]);
 
   // Multi-Touch & Pointer drag to orbit camera and pinch-to-zoom
   const handlePointerDown = (e: React.PointerEvent) => {

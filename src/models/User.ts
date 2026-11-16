@@ -6,6 +6,8 @@ export interface IUserDocument extends Document {
   email: string;
   passwordHash: string;
   role: UserRole;
+  dateOfBirth?: Date;
+  isAgeVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +37,15 @@ const UserSchema = new Schema<IUserDocument>(
       enum: ['user', 'admin'],
       default: 'user',
       index: true,
+    },
+    dateOfBirth: {
+      type: Date,
+      required: false,
+    },
+    isAgeVerified: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
   },
   {

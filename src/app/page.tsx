@@ -22,8 +22,12 @@ import {
   Calendar,
   Camera,
   Download,
+  Satellite,
+  Play,
+  Pause,
 } from 'lucide-react';
 import GlobeCanvas, { GlobeCanvasHandle } from '@/components/globe/GlobeCanvas';
+import ISSPassModal from '@/components/iss/ISSPassModal';
 import { CITIES, findNearestCity, resolveUserCity } from '@/lib/cities';
 import {
   getCityTime,
@@ -37,6 +41,7 @@ import {
   getISSOrbitalPosition,
   getPhotographySolarHours,
   generateCalendarMeetingLinks,
+  getSolarElevationAndShadow,
   LocalCelestialPosition,
   EarthOrbitalTelemetry,
   LunarDetailedEphemeris,
@@ -97,6 +102,41 @@ export default function HomePage() {
   // Geolocation state
   const [isLocating, setIsLocating] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [detectedGpsCityId, setDetectedGpsCityId] = useState<string | null>(null);
+
+  // Interactive Time-Travel & Fast-Forward Simulation state
+  const [timeTravelMinutes, setTimeTravelMinutes] = useState<number>(0);
+  const [isPlayingTimeTravel, setIsPlayingTimeTravel] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(300);
+  const [isTimeTravelOpen, setIsTimeTravelOpen] = useState<boolean>(false);
+
+  // ISS Flyover Radar Modal state
+  const [isISSPassModalOpen, setIsISSPassModalOpen] = useState<boolean>(false);
+
+  const [simulatedDate, setSimulatedDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      if (timeTravelMinutes === 0 && !isPlayingTimeTravel) {
+        setSimulatedDate(null);
+      } else {
+        setSimulatedDate(new Date(Date.now() + timeTravelMinutes * 60000));
+      }
+    });
+  }, [timeTravelMinutes, isPlayingTimeTravel]);
+
+  // Simulation Fast-Forward Loop (60x, 300x, 1200x)
+  useEffect(() => {
+    if (!isPlayingTimeTravel) return;
+    const interval = setInterval(() => {
+      setTimeTravelMinutes((prev) => {
+        const advance = (playbackSpeed * 0.1) / 60;
+        const next = prev + advance;
+        return next > 720 ? -720 : next;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isPlayingTimeTravel, playbackSpeed]);
 
   // Live celestial state
   const [sun, setSun] = useState<{ lat: number; lng: number } | null>(null);
@@ -130,6 +170,7 @@ export default function HomePage() {
       if (matched) {
         queueMicrotask(() => {
           setCityA(matched);
+          setDetectedGpsCityId(matched.id);
         });
       }
     } catch (e) {
@@ -137,10 +178,10 @@ export default function HomePage() {
     }
   }, []);
 
-  // 2. Update clocks and celestial positions every second
+  // 2. Update clocks and celestial positions every second or simulated frame
   useEffect(() => {
     const update = () => {
-      const now = new Date();
+      const now = simulatedDate || new Date();
       setTimeA(getCityTime(cityA, now));
       setTimeB(getCityTime(cityB, now));
       setComparison(compareCities(cityA, cityB, now));
@@ -156,7 +197,7 @@ export default function HomePage() {
     queueMicrotask(update);
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [cityA, cityB]);
+  }, [cityA, cityB, simulatedDate]);
 
   // Handle GPS Geolocation click
   const handleDetectLocation = () => {
@@ -167,6 +208,7 @@ export default function HomePage() {
       const fallback = resolveUserCity();
       setCityA(fallback);
       setFocusedTarget('primary');
+      setDetectedGpsCityId(fallback.id);
       setLocationMessage(`Timezone matched: ${fallback.city}, ${fallback.country}`);
       setIsLocating(false);
       return;
@@ -178,6 +220,7 @@ export default function HomePage() {
         const nearest = findNearestCity(latitude, longitude);
         setCityA(nearest);
         setFocusedTarget('primary');
+        setDetectedGpsCityId(nearest.id);
         setLocationMessage(
           `Coordinates: ${nearest.city}, ${nearest.country} (${latitude.toFixed(2)}°, ${longitude.toFixed(2)}°)`
         );
@@ -189,6 +232,7 @@ export default function HomePage() {
         const fallback = resolveUserCity();
         setCityA(fallback);
         setFocusedTarget('primary');
+        setDetectedGpsCityId(fallback.id);
         setLocationMessage(`Selected closest timezone hub: ${fallback.city}, ${fallback.country}`);
         setIsLocating(false);
         setTimeout(() => setLocationMessage(null), 8000);
@@ -314,8 +358,33 @@ export default function HomePage() {
   const activeCelestial = activeObserver === 'A' ? celestialA : celestialB;
   const activeTime = activeObserver === 'A' ? timeA : timeB;
   const activePhoto = useMemo(() => getPhotographySolarHours(activeCity.lat, activeCity.lng), [activeCity]);
+  const activeShadow = useMemo(() => {
+    return getSolarElevationAndShadow(activeCity.lat, activeCity.lng, simulatedDate || new Date());
+  }, [activeCity.lat, activeCity.lng, simulatedDate]);
   const sunRadar = getRadarCoords(activeCelestial?.sun.altitudeDeg, activeCelestial?.sun.azimuthDeg);
   const moonRadar = getRadarCoords(activeCelestial?.moon.altitudeDeg, activeCelestial?.moon.azimuthDeg);
+
+  const formatTimeTravelOffset = (mins: number): string => {
+    if (mins === 0) return '0h (Real Time)';
+    const sign = mins > 0 ? '+' : '-';
+    const abs = Math.abs(mins);
+    const h = Math.floor(abs / 60);
+    const m = Math.round(abs % 60);
+    return `${sign}${h}h ${m > 0 ? `${m}m` : ''}`.trim();
+  };
+
+  const formatSimulatedClock = (d: Date | null): string => {
+    if (!d) return 'Live UTC';
+    return (
+      new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZone: 'UTC',
+      }).format(d) + ' UTC'
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col items-center justify-start w-full bg-black text-white">
@@ -332,6 +401,7 @@ export default function HomePage() {
             focusedTarget={focusedTarget}
             onFocusChange={setFocusedTarget}
             autoRotate={isAutoRotating}
+            simulatedDate={simulatedDate}
             className="w-full h-full"
           />
         </div>
@@ -377,6 +447,35 @@ export default function HomePage() {
                 <RotateCw className={`w-3.5 h-3.5 ${isAutoRotating ? 'animate-spin-slow' : ''}`} />
               </button>
             </div>
+
+            {/* Time Travel Simulation Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsTimeTravelOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-light tracking-[0.16em] uppercase transition-all cursor-pointer backdrop-blur-md shadow-lg ${
+                isTimeTravelOpen || timeTravelMinutes !== 0 || isPlayingTimeTravel
+                  ? 'bg-[#fea082]/20 border border-[#fea082] text-white shadow-[0_0_12px_rgba(254,160,130,0.3)]'
+                  : 'bg-black/60 hover:bg-black/80 border border-white/20 text-zinc-300 hover:text-white'
+              }`}
+              title="Toggle Interactive Time Travel & 24h Orbital Playback"
+            >
+              <Clock className="w-3.5 h-3.5 text-[#fea082]" />
+              <span className="hidden sm:inline">Time Travel</span>
+              {(timeTravelMinutes !== 0 || isPlayingTimeTravel) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-[#fea082] animate-ping" />
+              )}
+            </button>
+
+            {/* ISS Radar Button */}
+            <button
+              type="button"
+              onClick={() => setIsISSPassModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-light tracking-[0.16em] uppercase text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-sky-400 backdrop-blur-md transition-all cursor-pointer shadow-lg"
+              title="Predict ISS Flyover Passes"
+            >
+              <Satellite className="w-3.5 h-3.5 text-[#38bdf8]" />
+              <span className="hidden sm:inline">ISS Radar</span>
+            </button>
 
             <button
               onClick={() => setIsDrawerOpen(true)}
@@ -538,6 +637,110 @@ export default function HomePage() {
           </button>
         </div>
 
+        {/* --- Interactive Time-Travel & 24-Hour Orbital Playback Bar --- */}
+        {isTimeTravelOpen && (
+          <div className="relative z-20 w-full mb-2 px-3 sm:px-8 pointer-events-none">
+            <div className="max-w-2xl mx-auto glass-panel rounded-2xl p-3 sm:p-4 border border-[#fea082]/30 bg-black/85 backdrop-blur-2xl shadow-2xl space-y-2.5 pointer-events-auto animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#fea082] animate-pulse" />
+                  <span className="text-[11px] font-light tracking-[0.2em] uppercase text-white">
+                    Orbital Time-Travel Simulation
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsPlayingTimeTravel((prev) => !prev)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                      isPlayingTimeTravel
+                        ? 'bg-[#fea082] text-black font-semibold shadow-[0_0_10px_#fea082]'
+                        : 'bg-white/10 hover:bg-white/20 text-white'
+                    }`}
+                    title={isPlayingTimeTravel ? 'Pause Simulation' : 'Play 24-Hour Orbital Fast-Forward'}
+                  >
+                    {isPlayingTimeTravel ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                    <span>{isPlayingTimeTravel ? 'Pause' : 'Fast-Forward'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const speeds = [60, 300, 1200];
+                      const nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
+                      setPlaybackSpeed(speeds[nextIdx]);
+                    }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-mono text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer"
+                    title="Cycle Playback Speed"
+                  >
+                    {playbackSpeed}x
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimeTravelMinutes(0);
+                      setIsPlayingTimeTravel(false);
+                    }}
+                    disabled={timeTravelMinutes === 0 && !isPlayingTimeTravel}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer ${
+                      timeTravelMinutes === 0 && !isPlayingTimeTravel
+                        ? 'opacity-40 cursor-not-allowed text-zinc-500 bg-transparent'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
+                    }`}
+                    title="Reset to Real-Time Wall Clock"
+                  >
+                    ● Live Now
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsTimeTravelOpen(false)}
+                    className="p-1 text-zinc-400 hover:text-white rounded-md hover:bg-white/10 transition-colors"
+                    title="Hide Time Travel Bar"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Range Slider (-720 to +720 minutes) */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-zinc-400">
+                    Offset: <strong className="text-[#fea082]">{formatTimeTravelOffset(timeTravelMinutes)}</strong>
+                  </span>
+                  <span className="text-zinc-300 font-light truncate">
+                    Simulated: <strong className="text-white font-mono">{formatSimulatedClock(simulatedDate)}</strong>
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="-720"
+                  max="720"
+                  step="15"
+                  value={timeTravelMinutes}
+                  onChange={(e) => {
+                    setTimeTravelMinutes(parseInt(e.target.value, 10));
+                    setIsPlayingTimeTravel(false);
+                  }}
+                  className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#fea082]"
+                />
+
+                <div className="flex justify-between text-[9px] text-zinc-500 font-mono px-0.5">
+                  <span>-12h</span>
+                  <span>-6h</span>
+                  <span className="text-zinc-300">NOW</span>
+                  <span>+6h</span>
+                  <span>+12h</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- Bottom Floating Dual Clocks & Location Switcher Dock --- */}
         <div className="relative z-10 w-full pb-3 px-4 sm:px-8 pointer-events-none">
           {isDockCollapsed ? (
@@ -630,22 +833,28 @@ export default function HomePage() {
                     </div>
 
                     {/* Right: Digital Time + GPS + UTC */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <span suppressHydrationWarning className="text-sm sm:text-base font-mono font-light text-white tracking-wider whitespace-nowrap">
                         {timeA?.currentTime || '--:--:--'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDetectLocation();
-                        }}
-                        disabled={isLocating}
-                        className="p-1 rounded-md text-zinc-300 hover:text-white bg-white/10 border border-white/15 active:scale-95 transition-all"
-                        title="Detect GPS"
-                      >
-                        <Navigation className={`w-3 h-3 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
-                      </button>
+                      {cityA.id === detectedGpsCityId ? (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
+                          GPS
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDetectLocation();
+                          }}
+                          disabled={isLocating}
+                          className="p-1 rounded-md text-zinc-300 hover:text-white bg-white/10 border border-white/15 active:scale-95 transition-all"
+                          title="Detect GPS"
+                        >
+                          <Navigation className={`w-3 h-3 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
+                        </button>
+                      )}
                       <span className="text-[10px] font-mono text-zinc-400 w-12 text-right">
                         {timeA?.utcOffset}
                       </span>
@@ -702,11 +911,15 @@ export default function HomePage() {
                     </div>
 
                     {/* Right: Digital Time + UTC */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <span suppressHydrationWarning className="text-sm sm:text-base font-mono font-light text-[#fea082] tracking-wider whitespace-nowrap">
                         {timeB?.currentTime || '--:--:--'}
                       </span>
-                      <span className="w-6" />
+                      {cityB.id === detectedGpsCityId && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30">
+                          GPS
+                        </span>
+                      )}
                       <span className="text-[10px] font-mono text-zinc-400 w-12 text-right">
                         {timeB?.utcOffset}
                       </span>
@@ -814,16 +1027,23 @@ export default function HomePage() {
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={handleDetectLocation}
-                          disabled={isLocating}
-                          className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider uppercase text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-[#38bdf8] transition-all cursor-pointer flex items-center gap-1"
-                          title="Detect current location via GPS"
-                        >
-                          <Navigation className={`w-2.5 h-2.5 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
-                          <span>GPS</span>
-                        </button>
+                        {cityA.id === detectedGpsCityId ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1">
+                            <Navigation className="w-2.5 h-2.5" />
+                            <span>GPS</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleDetectLocation}
+                            disabled={isLocating}
+                            className="px-2 py-0.5 rounded text-[10px] font-mono tracking-wider uppercase text-zinc-300 bg-white/10 hover:bg-white/20 border border-white/15 hover:border-[#38bdf8] transition-all cursor-pointer flex items-center gap-1"
+                            title="Detect current location via GPS and set as Location A"
+                          >
+                            <Navigation className={`w-2.5 h-2.5 text-[#38bdf8] ${isLocating ? 'animate-spin' : ''}`} />
+                            <span>Locate</span>
+                          </button>
+                        )}
                         <span className="text-[10px] font-mono text-zinc-400">
                           {timeA?.utcOffset}
                         </span>
@@ -898,9 +1118,17 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-mono text-zinc-400 shrink-0">
-                        {timeB?.utcOffset}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {cityB.id === detectedGpsCityId && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1">
+                            <Navigation className="w-2.5 h-2.5" />
+                            <span>GPS</span>
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {timeB?.utcOffset}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Card Body: Digital Time (Click to focus on Globe) */}
@@ -1206,6 +1434,34 @@ export default function HomePage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Real-Time Solar Shadow & UV Estimation */}
+                    <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5 text-zinc-400">
+                          <Sun className="w-3.5 h-3.5 text-amber-300" /> Shadow Multiplier:
+                        </span>
+                        <span suppressHydrationWarning className="font-mono text-[#fea082] text-sm font-medium">
+                          {activeShadow.shadowLengthFactor !== null ? `${activeShadow.shadowLengthFactor}× height` : 'None (Night)'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-zinc-400">
+                        <span suppressHydrationWarning className="truncate">{activeShadow.shadowDescription}</span>
+                        <span suppressHydrationWarning className="font-mono shrink-0 ml-1">
+                          UV: {activeShadow.uvIndexEstimate}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ISS Quick Pass Radar Trigger */}
+                    <button
+                      type="button"
+                      onClick={() => setIsISSPassModalOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-sky-950/30 hover:bg-sky-900/40 border border-sky-400/30 text-sky-200 text-xs font-light transition-all cursor-pointer shadow-sm"
+                    >
+                      <Satellite className="w-3.5 h-3.5 text-[#38bdf8]" />
+                      <span>Predict ISS Flyovers for {activeCity.city}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1662,6 +1918,13 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      {/* ISS Pass Prediction Modal */}
+      <ISSPassModal
+        isOpen={isISSPassModalOpen}
+        onClose={() => setIsISSPassModalOpen(false)}
+        city={cityA}
+      />
     </div>
   );
 }

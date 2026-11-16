@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function DocsPage() {
-  const [endpoint, setEndpoint] = useState<'/api/v1/compare' | '/api/v1/time' | '/api/v1/zones' | '/api/analytics'>('/api/v1/compare');
+  const [endpoint, setEndpoint] = useState<'/api/v1/compare' | '/api/v1/time' | '/api/v1/zones' | '/api/analytics' | '/api/health'>('/api/v1/compare');
   const [fromParam, setFromParam] = useState('Tokyo');
   const [toParam, setToParam] = useState('London');
   const [locationParam, setLocationParam] = useState('New_York');
@@ -47,6 +47,8 @@ export default function DocsPage() {
         url = zonesQuery ? `/api/v1/zones?q=${encodeURIComponent(zonesQuery)}` : '/api/v1/zones';
       } else if (endpoint === '/api/analytics') {
         url = `/api/analytics?scope=${analyticsScope}&range=${analyticsRange}`;
+      } else if (endpoint === '/api/health') {
+        url = '/api/health';
       }
 
       const headers: Record<string, string> = {};
@@ -86,7 +88,10 @@ curl -X GET "https://timeorbit-chi.vercel.app/api/v1/compare?from=Tokyo&to=Londo
   -H "x-api-key: YOUR_API_KEY"
 
 # 3. Query supported metropolitan hubs (Public)
-curl -X GET "https://timeorbit-chi.vercel.app/api/v1/zones?q=paris"`,
+curl -X GET "https://timeorbit-chi.vercel.app/api/v1/zones?q=paris"
+
+# 4. Deployment Health & Uptime Probe (Public)
+curl -X GET "https://timeorbit-chi.vercel.app/api/health"`,
     javascript: `// Query TimeOrbit API with async/await
 const API_KEY = 'to_live_your_api_key_here';
 
@@ -200,12 +205,13 @@ print("Solar Elevation:", data["data"]["solar"]["elevation"])`,
               <h3 className="text-xs font-light tracking-[0.2em] uppercase text-zinc-400">Select Target Endpoint</h3>
 
               {/* Endpoint Tabs */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {[
                   { id: '/api/v1/compare', label: '/compare' },
                   { id: '/api/v1/time', label: '/time' },
                   { id: '/api/v1/zones', label: '/zones' },
                   { id: '/api/analytics', label: '/analytics' },
+                  { id: '/api/health', label: '/health' },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -300,6 +306,15 @@ print("Solar Elevation:", data["data"]["solar"]["elevation"])`,
                       <option value="all">all (Full History)</option>
                     </select>
                   </div>
+                </div>
+              )}
+
+              {endpoint === '/api/health' && (
+                <div className="pt-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-300">
+                  <p className="font-mono text-[11px] text-[#fea082] uppercase mb-1">Deployment Health & Uptime Probe</p>
+                  <p className="text-zinc-400 font-light text-[11px] leading-relaxed">
+                    Publicly accessible endpoint reporting system uptime, heap memory, database ping latency, and environment status. No parameters or auth headers required.
+                  </p>
                 </div>
               )}
 
@@ -566,6 +581,50 @@ print("Solar Elevation:", data["data"]["solar"]["elevation"])`,
             <p className="text-xs text-zinc-300 font-light leading-relaxed">
               Provides granular telemetry: request volume, latency distributions, status code breakdowns, and endpoint allocations over 24-hour, 7-day, or 30-day timeframes.
             </p>
+          </div>
+
+          {/* Endpoint 5: GET /api/health */}
+          <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="px-2.5 py-1 rounded bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-medium flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5" />
+                  GET
+                </span>
+                <span className="font-mono text-white text-sm">/api/health</span>
+              </div>
+              <span className="text-[10px] font-mono tracking-widest uppercase px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-emerald-400">
+                Public // No Auth
+              </span>
+            </div>
+
+            <p className="text-xs text-zinc-300 font-light leading-relaxed">
+              Enterprise deployment health probe for uptime monitors, Kubernetes/Docker liveness probes, and load balancers. Returns server uptime, memory footprint, and MongoDB query ping latency.
+            </p>
+
+            <div className="bg-black/80 rounded-xl p-4 border border-white/10">
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mb-2">Example 200 OK Response</span>
+              <pre className="text-xs font-mono text-zinc-300 overflow-x-auto">
+{`{
+  "status": "healthy",
+  "service": "TimeOrbit Planetary Observatory API",
+  "version": "1.0.0",
+  "timestamp": "2026-11-16T06:30:00.000Z",
+  "uptimeSeconds": 28410,
+  "environment": "production",
+  "database": {
+    "status": "connected",
+    "latencyMs": 12
+  },
+  "system": {
+    "memoryHeapUsedMB": 42.1,
+    "memoryRssMB": 98.4,
+    "nodeVersion": "v20.x"
+  },
+  "totalDurationMs": 13
+}`}
+              </pre>
+            </div>
           </div>
         </div>
       </section>

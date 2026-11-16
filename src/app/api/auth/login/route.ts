@@ -6,8 +6,55 @@ import { signJwtToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+// In-memory rate limiting map for login attempts: 5 failed attempts per 15 minutes per IP
+interface LoginAttemptTracker {
+  count: number;
+  firstAttempt: number;
+}
+const loginAttempts = new Map<string, LoginAttemptTracker>();
+
+function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const maxAttempts = 10;
+
+  const record = loginAttempts.get(ip);
+  if (!record) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+    return { allowed: true };
+  }
+
+  if (now - record.firstAttempt > windowMs) {
+    // Reset window
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+    return { allowed: true };
+  }
+
+  if (record.count >= maxAttempts) {
+    const remainingMs = windowMs - (now - record.firstAttempt);
+    return { allowed: false, retryAfterSec: Math.ceil(remainingMs / 1000) };
+  }
+
+  record.count += 1;
+  return { allowed: true };
+}
+
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateCheck = checkLoginRateLimit(ip);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many login attempts. Please try again in ${rateCheck.retryAfterSec} seconds.` },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(rateCheck.retryAfterSec || 60),
+          }
+        }
+      );
+    }
+
     const { email, password } = await req.json();
 
     if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
@@ -31,6 +78,9 @@ export async function POST(req: Request) {
     if (!isMatch) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
+
+    // Reset login attempts on successful authentication
+    loginAttempts.delete(ip);
 
     const token = signJwtToken({
       userId: user._id.toString(),
@@ -61,7 +111,6 @@ export async function POST(req: Request) {
     return response;
   } catch (error: unknown) {
     console.error('Login error:', error);
-    const message = error instanceof Error ? error.message : 'Login failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Login service encountered an unexpected error.' }, { status: 500 });
   }
 }

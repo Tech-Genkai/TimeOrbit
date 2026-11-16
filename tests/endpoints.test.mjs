@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { GET as getTimeHandler } from '@/app/api/v1/time/route';
 import { GET as getCompareHandler } from '@/app/api/v1/compare/route';
 import { GET as getZonesHandler } from '@/app/api/v1/zones/route';
+import { GET as getHealthHandler } from '@/app/api/health/route';
 import { ApiKey } from '@/models/ApiKey';
 import { ApiLog } from '@/models/ApiLog';
 
@@ -153,6 +154,17 @@ export async function runEndpointsTests() {
     const json = await res.json();
     assert.strictEqual(json.success, true);
     assert(json.cities.some(c => c.city.toLowerCase() === 'tokyo'));
+  });
+
+  // --- 4. /api/health ---
+  await test('GET /api/health returns 200 healthy status with system telemetry', async () => {
+    const res = await getHealthHandler();
+    assert.strictEqual(res.status, 200);
+    const json = await res.json();
+    assert.strictEqual(json.status, 'healthy');
+    assert.strictEqual(typeof json.uptimeSeconds, 'number');
+    assert.strictEqual(typeof json.system.memoryHeapUsedMB, 'number');
+    assert(json.service.includes('TimeOrbit'));
   });
 
   return { passed, failed };

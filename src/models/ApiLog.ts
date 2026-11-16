@@ -45,7 +45,6 @@ const ApiLogSchema = new Schema<IApiLogDocument>(
     createdAt: {
       type: Date,
       default: Date.now,
-      index: true,
     },
   },
   {
@@ -56,6 +55,8 @@ const ApiLogSchema = new Schema<IApiLogDocument>(
 // High-performance compound indexes for rolling window rate limiting & telemetry queries
 ApiLogSchema.index({ apiKeyId: 1, createdAt: -1 });
 ApiLogSchema.index({ userId: 1, createdAt: -1 });
+// Auto-expire telemetry logs after 30 days (Privacy & GDPR compliance)
+ApiLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
 
 export const ApiLog: Model<IApiLogDocument> =
   mongoose.models.ApiLog || mongoose.model<IApiLogDocument>('ApiLog', ApiLogSchema);

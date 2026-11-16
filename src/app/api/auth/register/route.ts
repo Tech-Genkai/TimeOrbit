@@ -6,12 +6,78 @@ import { signJwtToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+// Rate limiting map for registration attempts: max 5 registrations per 15 minutes per IP
+const registrationAttempts = new Map<string, { count: number; firstAttempt: number }>();
+
+function checkRegisterRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxAttempts = 5;
+
+  const record = registrationAttempts.get(ip);
+  if (!record) {
+    registrationAttempts.set(ip, { count: 1, firstAttempt: now });
+    return { allowed: true };
+  }
+
+  if (now - record.firstAttempt > windowMs) {
+    registrationAttempts.set(ip, { count: 1, firstAttempt: now });
+    return { allowed: true };
+  }
+
+  if (record.count >= maxAttempts) {
+    const remainingMs = windowMs - (now - record.firstAttempt);
+    return { allowed: false, retryAfterSec: Math.ceil(remainingMs / 1000) };
+  }
+
+  record.count += 1;
+  return { allowed: true };
+}
+
 export async function POST(req: Request) {
   try {
-    const { name, email, password } = await req.json();
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateCheck = checkRegisterRateLimit(ip);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Registration limit reached. Please try again in ${rateCheck.retryAfterSec} seconds.` },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(rateCheck.retryAfterSec || 60),
+          }
+        }
+      );
+    }
+
+    const { name, email, password, dateOfBirth } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    }
+
+    if (!dateOfBirth) {
+      return NextResponse.json({ error: 'Date of birth is required for age verification (must be 18+)' }, { status: 400 });
+    }
+
+    const dob = new Date(dateOfBirth);
+    if (isNaN(dob.getTime())) {
+      return NextResponse.json({ error: 'Invalid date of birth format' }, { status: 400 });
+    }
+
+    // Strict 18+ age calculation
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+
+    if (age < 18) {
+      return NextResponse.json(
+        { error: 'Age verification failed: You must be at least 18 years old to create an account.' },
+        { status: 403 }
+      );
     }
 
     if (typeof email !== 'string' || typeof password !== 'string') {
@@ -48,6 +114,8 @@ export async function POST(req: Request) {
       email: normalizedEmail,
       passwordHash,
       role: 'user',
+      dateOfBirth: dob,
+      isAgeVerified: true,
     });
 
     const token = signJwtToken({
@@ -82,7 +150,6 @@ export async function POST(req: Request) {
     return response;
   } catch (error: unknown) {
     console.error('Registration error:', error);
-    const message = error instanceof Error ? error.message : 'Registration failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: 'Registration service encountered an unexpected error.' }, { status: 500 });
   }
 }

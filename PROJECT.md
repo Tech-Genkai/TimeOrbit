@@ -43,6 +43,18 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | 28 | Multi-Touch Touch Gestures | 2-finger pinch-to-zoom and 1-finger orbit rotation on touchscreens with adaptive mobile camera distance and vertical offset | M8 | User Request |
 | 29 | Progressive Web App Service Worker | Hybrid offline caching in `public/sw.js` and automated registration via `ServiceWorkerRegister.tsx` | M8 | Architecture |
 | 30 | Cross-Platform Cloud CI/CD | GitHub Actions pipeline (`.github/workflows/build-apps.yml`) to compile Android APK and package Windows Live Wallpaper zip | M8 | User Request |
+| 31 | Digital Chronometer & Observatories | Precision millisecond digital clock, 40+ observatories, Julian day, solar elevation, microsecond stopwatch with lap splits, Pomodoro timer with Web Audio API chime | M9 | User Request |
+| 32 | Chrono Calendar & Milestone Hub | Annual birthdays (age calculation), Anniversaries (milestones & symbols), Priority Reminders, Solstices/Equinoxes, Verified Holidays/Festivals, quick-nav jump, .ICS export | M9 | User Request |
+| 33 | Universal Batch Toast Engine | Global `useToast` hook, 5 categories (success, error, warning, info, celestial), `showBatch` staggered cascade, progress bars, hover pause, action callbacks (Undo) | M9 | User Request |
+| 34 | Complete Error Boundaries & Diagnostic Lab | 401 Unauthorized, 403 Forbidden, 404 Not Found, 500 Route Error, 500 Global Error, and `/error` live testing lab | M9 | User Request |
+| 35 | Deployment Health Check API | Public `GET /api/health` endpoint returning server uptime, process heap/RSS memory, MongoDB ping latency, and environment version | M9 | Architecture |
+| 36 | Production Security & SEO Hardening | Next.js security headers (nosniff, SAMEORIGIN, HSTS, Referrer/Permissions policies), dynamic `robots.ts`, and dynamic `sitemap.ts` | M9 | Architecture |
+| 37 | Edge Auth Middleware Gatekeeper | Next.js Edge Middleware (`src/middleware.ts`) intercepting `/admin/*` and `/dashboard/*` with JWT verification and `/forbidden` rewrites | M10 | Security |
+| 38 | Authentication Rate Limiting & DoS Shield | In-memory sliding window rate limiting on `/api/auth/login` (10 per 15m) and `/api/auth/register` (5 per 15m) with Retry-After headers | M10 | Security |
+| 39 | W3C CORS & Credentials Alignment | Scoped CORS wildcard permissions strictly to public `/api/v1/*` routes, eliminating credentials conflict | M10 | Architecture |
+| 40 | Privacy & GDPR 30-Day TTL Telemetry Expiry | Automated MongoDB TTL index on `ApiLog.createdAt` expiring telemetry data after 30 days | M10 | Privacy |
+| 41 | Route Loading Skeleton Architecture | Observatory-themed React Suspense streaming skeleton (`src/app/loading.tsx`) | M10 | Performance |
+| 42 | Full 4-Platform GitHub Actions CI/CD | Automated cloud builds for Android APK, Windows Desktop Live Wallpaper, macOS App bundle, and iOS Web Clip guide | M10 | CI/CD |
 
 ---
 
@@ -57,6 +69,8 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 | M6 | Desktop Live Wallpaper & Cross-Platform | Offline WebGL 3D live wallpaper (`wallpaper/`), dual city dropdowns, header-free clean view, `/wallpaper` route, and universal CORS (`vercel.json`) | M5 | DONE |
 | M7 | Token Bucket Traffic Shaping Engine | $O(1)$ Token Bucket algorithm in `src/lib/tokenBucket.ts`, burst handling, continuous refill, dual-engine router, and 72-test suite | M4, M6 | DONE |
 | M8 | Production Deployment, Mobile Optimization & Cross-Platform CI/CD | Live Vercel deployment, compact mobile dock redesign, touch pinch-to-zoom, PWA offline service worker, and GitHub Actions APK/Wallpaper builder | M6, M7 | DONE |
+| M9 | Digital Chronometer, Chrono Calendar, Batch Toast & Deployment Hardening | High-precision `/clock`, milestone `/calendar`, universal Batch Toast Engine, 5 error boundaries, `/error` diagnostic lab, `/api/health` probe, SEO sitemap/robots, 82-test suite | M8 | DONE |
+| M10 | Security Hardening, Edge Middleware & Privacy | Edge Auth Middleware, Auth rate limiting, CORS scoping, 30-day ApiLog TTL index, Suspense loading skeleton, and multi-platform CI/CD | M9 | DONE |
 
 ---
 
@@ -118,12 +132,12 @@ TimeOrbit is a Next.js (App Router, React 19, Tailwind CSS v4, MongoDB/Mongoose)
 ### 3. Automated Test Command Contract
 - Command: `npm test`
 - Runner: Node ESM Test Runner with Web API loader
-- Total Tests: **72 passed, 0 failed (100%)**
+- Total Tests: **82 passed, 0 failed (100%)**
 - Test Coverage:
-  - `timeEngine.test.mjs` (8 tests)
+  - `timeEngine.test.mjs` (17 tests)
   - `apiKey.test.mjs` (8 tests)
   - `tokenBucket.test.mjs` (9 tests)
-  - `endpoints.test.mjs` (7 tests)
+  - `endpoints.test.mjs` (8 tests)
   - `analytics_empirical_challenge.mjs` (29 tests)
   - `adversarial_telemetry_stress.mjs` (11 tests)
 

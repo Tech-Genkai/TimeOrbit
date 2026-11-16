@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Globe2, Key, BookOpen, ShieldCheck, LogOut, ArrowRight, Clock, Menu, X } from 'lucide-react';
+import { Globe2, Key, BookOpen, ShieldCheck, LogOut, ArrowRight, Clock, Menu, X, Timer, CalendarDays } from 'lucide-react';
 
 interface UserSession {
   id: string;
@@ -54,31 +54,33 @@ export default function Navbar() {
 
   const navLinks = [
     { name: '3D Earth', href: '/', icon: Globe2 },
-    { name: 'Compare Studio', href: '/compare', icon: Clock },
+    { name: 'Compare', href: '/compare', icon: Clock },
+    { name: 'Clock', href: '/clock', icon: Timer },
+    { name: 'Calendar', href: '/calendar', icon: CalendarDays },
     { name: 'API Docs', href: '/docs', icon: BookOpen },
     { name: 'Dashboard', href: '/dashboard', icon: Key },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-black/80 backdrop-blur-xl border-b border-white/10 transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand Logo (Inspired by Solar Explorer .logo) */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="relative w-8 h-8 rounded-full bg-white/5 border border-white/20 flex items-center justify-center group-hover:border-[#fea082] transition-colors">
-            <Globe2 className="w-4 h-4 text-white" />
+    <header className="sticky top-0 z-50 w-full bg-black/75 backdrop-blur-2xl border-b border-white/[0.08] transition-all">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between gap-4">
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+          <div className="w-8 h-8 rounded-full bg-white/5 border border-white/15 flex items-center justify-center group-hover:border-[#fea082] transition-colors shadow-sm shrink-0">
+            <Globe2 className="w-4 h-4 text-white group-hover:text-[#fea082] transition-colors" />
           </div>
           <div className="flex flex-col">
-            <span className="font-light text-sm sm:text-base tracking-[0.25em] text-white uppercase group-hover:text-[#fea082] transition-colors">
+            <span className="font-light text-sm tracking-[0.2em] text-white uppercase group-hover:text-[#fea082] transition-colors whitespace-nowrap">
               TimeOrbit
             </span>
-            <span className="text-[9px] text-[#fea082] tracking-[0.2em] uppercase font-light -mt-0.5">
-              Planetary Time & Orbit
+            <span className="text-[8.5px] text-[#fea082] tracking-[0.16em] uppercase font-mono -mt-0.5 whitespace-nowrap">
+              Planetary Observatory
             </span>
           </div>
         </Link>
 
-        {/* Desktop Nav Links */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* Desktop Nav Links: Sleek Floating Glass Capsule */}
+        <nav className="hidden md:flex items-center gap-1 bg-white/[0.03] border border-white/10 rounded-full p-1 backdrop-blur-md shadow-inner shrink-0">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -86,49 +88,51 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs tracking-[0.14em] uppercase transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs transition-all whitespace-nowrap shrink-0 ${
                   isActive
-                    ? 'text-white border-b-2 border-[#fea082] bg-white/5 font-medium'
+                    ? 'bg-white/15 text-white font-medium shadow-[0_0_12px_rgba(254,160,130,0.2)] border border-white/20'
                     : 'text-zinc-400 hover:text-white hover:bg-white/5 font-light'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#fea082]' : 'text-zinc-500'}`} />
-                <span>{link.name}</span>
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#fea082]' : 'text-zinc-500'}`} />
+                <span className="whitespace-nowrap">{link.name}</span>
+                {isActive && (
+                  <span className="w-1 h-1 rounded-full bg-[#fea082] shadow-[0_0_6px_#fea082] ml-0.5" />
+                )}
               </Link>
             );
           })}
+        </nav>
 
-          {/* Admin Panel Link */}
+        {/* User Actions & Admin Controls */}
+        <div className="hidden md:flex items-center gap-2.5 shrink-0">
           {user?.role === 'admin' && (
             <Link
               href="/admin"
-              className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs tracking-[0.14em] uppercase transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs transition-all whitespace-nowrap shrink-0 border ${
                 pathname === '/admin'
-                  ? 'bg-purple-950/40 text-purple-200 border border-purple-500/50'
-                  : 'text-purple-300 hover:text-white hover:bg-purple-950/20 border border-purple-500/20'
+                  ? 'bg-[#fea082]/20 border-[#fea082] text-white font-medium shadow-[0_0_10px_rgba(254,160,130,0.2)]'
+                  : 'bg-white/[0.03] border-white/10 text-zinc-400 hover:text-white hover:bg-white/10'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-              <span>Admin</span>
+              <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${pathname === '/admin' ? 'text-[#fea082]' : 'text-zinc-500'}`} />
+              <span className="whitespace-nowrap">Admin</span>
             </Link>
           )}
-        </nav>
 
-        {/* User Actions */}
-        <div className="hidden md:flex items-center gap-3">
           {loading ? (
-            <div className="w-20 h-7 bg-white/5 rounded-lg animate-pulse" />
+            <div className="w-20 h-7 bg-white/5 rounded-full animate-pulse" />
           ) : user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-white/[0.03] border border-white/10 rounded-full pl-1.5 pr-2 py-1 shrink-0">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-xs text-zinc-300 hover:text-white group"
+                className="flex items-center gap-2 text-xs text-zinc-300 hover:text-white group shrink-0 whitespace-nowrap"
               >
-                <div className="w-6 h-6 rounded-full bg-white/10 border border-white/20 text-[#fea082] flex items-center justify-center font-bold text-[10px]">
+                <div className="w-6 h-6 rounded-full bg-[#fea082]/20 border border-[#fea082]/40 text-[#fea082] flex items-center justify-center font-bold text-[10px] shrink-0">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
-                <div className="text-left hidden lg:block">
-                  <div className="text-xs font-light tracking-wider text-white">
+                <div className="text-left hidden lg:block whitespace-nowrap">
+                  <div className="text-xs font-light text-white whitespace-nowrap">
                     {user.name}
                   </div>
                 </div>
@@ -137,22 +141,22 @@ export default function Navbar() {
               <button
                 onClick={handleLogout}
                 title="Log out"
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-white/5 transition-all cursor-pointer"
+                className="p-1 rounded-full text-zinc-500 hover:text-rose-400 hover:bg-white/10 transition-all cursor-pointer shrink-0"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 rounded-lg text-xs font-light tracking-[0.14em] uppercase text-zinc-400 hover:text-white transition-all"
+                className="px-3 py-1 rounded-full text-xs font-light text-zinc-400 hover:text-white transition-all whitespace-nowrap"
               >
                 Sign In
               </Link>
               <Link
                 href="/register"
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs glow-btn"
+                className="flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs glow-btn whitespace-nowrap shrink-0"
               >
                 <span>API Key</span>
                 <ArrowRight className="w-3.5 h-3.5" />

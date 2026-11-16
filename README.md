@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose_8.10-green?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
-[![Test Suite](https://img.shields.io/badge/Tests-72%2F72%20Passed-brightgreen?style=for-the-badge&logo=vitest)](./tests)
+[![Test Suite](https://img.shields.io/badge/Tests-82%2F82%20Passed-brightgreen?style=for-the-badge&logo=vitest)](./tests)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](./LICENSE)
 
 **TimeOrbit** is an open-source, interactive 3D WebGL global timezone explorer, live desktop observatory, and developer platform. It combines real-time astronomical solar calculations, a multi-city time comparison matrix with working-hours overlap detection, a dedicated Windows desktop live wallpaper, and a high-throughput developer REST API backed by SHA-256 API key authentication, an **O(1) Token Bucket Rate Limiter**, and real-time telemetry analytics.
@@ -17,6 +17,11 @@
 
 - [Overview & Value Proposition](#-overview--value-proposition)
 - [Key Features](#-key-features)
+- [Digital Chronometer & Observatories (`/clock`)](#-dedicated-digital-clock-chronometer--precision-stopwatch-clock)
+- [Chrono Calendar & Milestone Hub (`/calendar`)](#-chrono-calendar--milestone-hub-calendar)
+- [Universal Batch Toast Notification Engine](#-universal-batch-toast-notification-engine)
+- [Enterprise Error Boundaries & Diagnostic Lab](#-enterprise-error-pages-boundaries--diagnostic-center)
+- [Production Security, Edge Middleware & Privacy Controls](#-production-security-edge-middleware--privacy-controls)
 - [Mobile & Responsive Architecture](#-mobile--responsive-architecture)
 - [Progressive Web App (PWA) Offline Engine](#-progressive-web-app-pwa-offline-engine)
 - [Cloud CI/CD & Cross-Platform Pipelines](#-cloud-cicd--cross-platform-pipelines)
@@ -33,7 +38,8 @@
   - [2. Timezone Comparison (`GET /api/v1/compare`)](#2-timezone-comparison-get-apiv1compare)
   - [3. Supported Zones (`GET /api/v1/zones`)](#3-supported-zones-get-apiv1zones)
   - [4. Usage Analytics (`GET /api/analytics`)](#4-usage-analytics-get-apianalytics)
-  - [5. Rate Limiting Engines (Token Bucket vs Sliding Window)](#5-rate-limiting-engines-token-bucket-vs-sliding-window)
+  - [5. Deployment Health Check (`GET /api/health`)](#5-deployment-health-check-get-apihealth)
+  - [6. Rate Limiting Engines (Token Bucket vs Sliding Window)](#6-rate-limiting-engines-token-bucket-vs-sliding-window)
 - [Windows Live Desktop Wallpaper](#-windows-live-desktop-wallpaper)
 - [Developer Dashboard & Key Management](#-developer-dashboard--key-management)
 - [Testing & Quality Assurance](#-testing--quality-assurance)
@@ -93,6 +99,76 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 - **Synchronized Column Grid Dock**: Dedicated column alignment for Location A and Location B dropdowns with styled custom chevron indicators.
 - **24-Hour Scrubber**: Interactive slider to simulate any time of day and visualize cross-continental working overlaps (09:00 - 18:00) with fractional offsets (`+05:30`, `+05:45`) and cross-day boundary indicators (`+1 Day`, `-1 Day`).
 
+### ⏱️ Interactive Time-Travel & 24-Hour Orbital Playback
+- **Floating Simulation Control Deck**: Smooth interactive timeline bar directly over the 3D globe supporting continuous scrubbing between -12h and +12h.
+- **Fast-Forward Playback Engine**: Real-time simulation at configurable speeds (**1x, 60x, 300x, 1200x**), allowing users to watch day turn into night over any continent in seconds.
+- **Dynamic Orbital Synchronization**: Physically moves directional sunlight, Day/Night terminator shading, the Solar Noon marker, Moon position, and the ISS satellite in direct response to the simulated timestamp.
+- **Instant "Live Now" Snap**: One-click recovery snapping back to real-time wall-clock tracking.
+
+### 🛰️ International Space Station (ISS) Flyover Radar & Pass Predictor
+- **Topocentric SGP4-Inspired Propagation**: Predicts the next 5 visible flyover passes of the ISS over any observer's metropolitan hub or GPS location within a 48-hour window.
+- **Full Sky Geometry**: Computes apex elevation angle (degrees above horizon), total pass duration, and compass rise/peak/set trajectories (e.g. `SW ➔ SE`).
+- **Naked-Eye Visibility Filter**: Automatically identifies twilight passes where the ISS is illuminated by high-altitude sunlight against an observer's dark sky—the optimal conditions for naked-eye sighting.
+
+### 🏢 Multi-City Comparison Studio & "Golden Window" Overlap Finder (`/compare`)
+- **Up to 5 Global Cities Simultaneously**: Compare time zones, daylight states, and coordinates across multi-continental teams.
+- **Golden Window Algorithm**: Automatically discovers overlapping standard working hours (09:00 - 18:00) across all selected locations, with fallback to extended waking hours (08:00 - 22:00).
+- **Unified 24-Hour Matrix Grid**: Cross-continental 24-hour visualization color-coded by work, waking, and sleeping states with 1-click team calendar sync.
+
+### ⏱️ Dedicated Digital Clock, Chronometer & Precision Stopwatch (`/clock`)
+- **Large Observatory Chronometer**: Giant glowing monospace digits (`HH:MM:SS.MS`) with 12h (AM/PM) vs. 24h Military toggle, global timezone selector from 40+ planetary hubs, and Fullscreen desk/observatory mode.
+- **Microsecond-Accurate Stopwatch**: High-frequency chronometer powered by `performance.now()` with split laps, delta times, fastest/slowest lap highlighting, and clipboard copy.
+- **CountDown Timer with Audio Synthesizer**: Configurable timer with quick presets (25m Pomodoro, 45m Deep Focus, 5m Break, 1m Sprint), circular SVG progress indicator, and custom Web Audio API oscillator chime alarm with zero external file dependencies.
+- **Astronomical Ephemeris Ribbon**: Live Julian Day calculations, Day of Year counters, Solar elevation, and 1-click ISO 8601 timestamp copying.
+
+### 📅 Chrono Calendar & Milestone Hub (`/calendar`)
+- **Full Interactive Month Grid**: Month-and-year navigator, "Today" quick jump, weekday alignment, and color-coded event indicator chips.
+- **🎂 Birthday Tracker**: Automatic age calculation ("Turning 28th"), birth year records, and live countdowns ("Today!", "In 14 days").
+- **💍 Anniversary Milestones**: Tracks relationship/wedding milestones ("5th Anniversary • Wood", "25th Silver Jubilee") with traditional gift symbols.
+- **🔔 Priority Reminders**: Configurable alerts with specific times, priorities (High, Medium, Low), and interactive completion checkmarks.
+- **🚀 Celestial Events**: Pre-populated with Vernal/Autumnal Equinoxes, Summer/Winter Solstices, and major meteor showers (Perseids, Geminids).
+- **🎆 Global Holidays & Festivals**: Verified international holiday schedule (Diwali, Christmas, Eid, Thanksgiving, New Year's, Republic Day, Independence Day, etc.).
+- **⚡ Instant Quick-Navigation**: Unified search and category filter pills with instant calendar jump to any date across years.
+- **1-Click .ICS Calendar Export**: Export individual milestones or download a unified `.ics` calendar bundle for instant import into Google Calendar, Apple iCal, or Outlook.
+- **Persistent Local Storage**: 100% sanitized local storage (zero mock/dummy data) with instant offline responsiveness.
+
+### 🍞 Universal Batch Toast Notification Engine (`src/context/ToastContext.tsx`)
+- **Context-Powered Global Hook (`useToast`)**: Accessible across all application pages and components.
+- **5 Distinct Toast Categories**: `success` (emerald), `error` (rose), `warning` (amber), `info` (sky blue), and `celestial` (starlight peach `#fea082`).
+- **Batch Cascades (`toast.showBatch([...])`)**: Fires multiple simultaneous or queued notifications with a sleek 120ms staggered cascade animation.
+- **Interactive Action Callbacks**: Inline buttons supporting interactive workflows (e.g. "Undo" on event deletion, "Re-try" on connection drops).
+- **Visual Time Remaining Bars**: Animated CSS keyframe progress bar (`shrinkWidth`) showing exact remaining time before dismissal.
+- **Hover Pause & Unified Dismissal**: Hovering pauses auto-dismiss countdown; an ambient header appears when $\ge 2$ toasts are active with a **"Clear All ({count})"** button.
+
+### 🛡️ Enterprise Error Pages, Boundaries & Diagnostic Center (`/error`)
+- **401 Unauthorized (`src/app/unauthorized.tsx`)**: Cosmic Astronaut Key screen for unauthenticated programmatic access with direct Sign In & Register links.
+- **403 Forbidden (`src/app/forbidden.tsx`)**: Glowing Amber Shield screen for non-admin accounts attempting restricted terminal access.
+- **404 Not Found (`src/app/not-found.tsx`)**: *"Trajectory Deviation // 404"* with rotating celestial compass and 4 quick re-alignment chips (3D Earth, Compare, Clock, Calendar).
+- **500 Route Error Boundary (`src/app/error.tsx`)**: Client-side Next.js boundary catching unexpected route runtime exceptions with one-click system reset.
+- **500 Global Layout Error Boundary (`src/app/global-error.tsx`)**: Native root layout fallback preventing browser white screens with reboot triggers.
+- **Diagnostic Lab (`/error`)**: Interactive simulator allowing developers and QA engineers to preview all 5 error layouts and test single/batch toast cascades side-by-side.
+
+### 🩺 Deployment Health Check & Uptime Monitoring (`GET /api/health`)
+- Dedicated production probe endpoint returning server uptime, process heap/RSS memory usage, MongoDB ping latency, and environment runtime metadata.
+- Pre-configured for Kubernetes liveness/readiness probes, Docker healthchecks, and uptime monitoring services.
+
+### ☀️ Solar Elevation, Azimuth & Ground Shadow Multiplier
+- **Real-Time Shadow Ratio**: Computes the physical shadow length factor ($1 / \tan(\theta)$) cast by vertical objects at any location.
+- **Local Celestial Coordinates**: Computes exact solar elevation angle, compass azimuth, and estimated clear-sky UV index factors.
+
+### 🔞 Mandatory 18+ Age Verification Architecture
+- **Site-Wide Compliance Gate (`AgeVerificationModal.tsx`)**: Global modal mounted in the root layout enforcing legal age confirmation with local state persistence.
+- **Client-Side Age Verification Form**: Date of Birth picker constrained by $18\text{ years ago today}$ with explicit legal certification checkboxes.
+- **Backend Chronological Enforcement**: Server-side chronological age validation on `/api/auth/register` returning `HTTP 403 Forbidden` for applicants under 18.
+
+### 🎨 Monochromatic Astrophysical Design (De-Vibe Coded)
+- **Deep Obsidian Glass Aesthetic**: Fully unified dark space observatory palette (`bg-black`, `border-white/10`, backdrop blur, celestial peach `#fea082` accents, and cosmic cyan `#38bdf8`).
+- **Zero Pastel/Neon Gradients**: Stripped away clownish vibe-coded cards and multi-colored boxes across `/admin` and `/dashboard` in favor of high-contrast data telemetry displays.
+
+### 🔋 Mobile WebGL Performance & Battery Optimization
+- **Background Frame Throttling**: Automatically skips WebGL rendering passes when browser tabs are hidden or minimized, preserving mobile battery life and preventing GPU overheating.
+- **Adaptive Pixel Ratio**: Caps render resolution at `1.75x` on high-density mobile displays to balance visual clarity with thermal efficiency.
+
 ### 🔭 Slide-Out Celestial Observatory Panel
 - Real-time astronomical telemetry deck displaying Sun & Moon altitude, azimuth, solar noon, dawn/dusk twilight times, and exact coordinates.
 
@@ -106,10 +182,14 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 - Global telemetry on `/admin` for administrators with API key review, approval, and revocation controls.
 - Dual-mode authentication support (JWT session cookie or API key header) with role-based scoping (`me` vs `global`).
 
-### 🛡️ Enterprise-Grade Security
-- Cryptographic SHA-256 API key hashing (`to_live_...` prefix; plaintext keys are never persisted).
-- Token Bucket rate limiting and MongoDB rolling window logging.
-- Passwords hashed with `bcryptjs` (salt rounds: 12) and sessions secured via HTTP-only, SameSite JWT cookies.
+### 🛡️ Enterprise-Grade Security, Edge Middleware & Privacy Controls
+- **Edge Auth Middleware (`src/middleware.ts`)**: Next.js Edge Runtime gatekeeper intercepting `/admin/*` and `/dashboard/*` requests before rendering, verifying JWT expiration and roles, and issuing instant redirects or 403 rewrites.
+- **Authentication Rate Limiting & DoS Shield**: In-memory sliding window defense on `/api/auth/login` (max 10 attempts per 15 minutes) and `/api/auth/register` (max 5 per 15 minutes) with `Retry-After` headers.
+- **Privacy & GDPR 30-Day Auto-Expiry**: Automated MongoDB TTL index on `ApiLog.createdAt` ensuring request IPs and telemetry are automatically pruned after 30 days.
+- **W3C CORS & Credentials Scoping**: Scoped wildcard CORS access strictly to public API routes (`/api/v1/*`), eliminating cross-origin cookie vulnerability conflicts.
+- **Cryptographic Key Hashing**: Cryptographic SHA-256 API key hashing (`to_live_...` prefix; plaintext keys are never persisted in the database).
+- **Token Bucket Rate Limiting**: $O(1)$ continuous mathematical traffic shaping with burst capabilities.
+- **Password & Session Hardening**: Passwords hashed with `bcryptjs` (salt rounds: 12) and sessions secured via HTTP-only, Secure (production), SameSite=Lax JWT cookies.
 
 ### 📱 Mobile & Responsive Architecture
 - **Compact Dual-Clock Dock (`md:hidden`)**: Side-by-side City A (5 cols), central swap (1 col), and City B (5 cols) layout reducing dock height by 78% (~80px vs ~370px).
@@ -125,9 +205,11 @@ Coordinating across global time zones introduces subtle pitfalls: Daylight Savin
 
 ### 🚀 Cloud CI/CD & Cross-Platform Pipelines
 - **Automated GitHub Actions (`.github/workflows/build-apps.yml`)**:
-  - Automatically compiles Android Trusted Web Activity (TWA) APK via `@bubblewrap/cli` using JDK 17 and Android CLI tools.
-  - Automatically packages the Windows Desktop Live Wallpaper zip containing `index.html`, `LivelyProperties.json`, textures, and setup documentation.
-  - Generates downloadable GitHub Release artifacts on every tag/release.
+  - **🤖 Android Mobile (.apk)**: Automatically compiles Android Trusted Web Activity (TWA) APK via `@bubblewrap/cli` using JDK 17 and Android CLI tools with automated keystore signing.
+  - **💻 Windows PC Desktop (.zip)**: Packages the standalone WebGL 3D live wallpaper and offline observatory bundle for Windows, Lively Wallpaper, and Wallpaper Engine.
+  - **🍏 Apple macOS Desktop (.zip)**: Builds a native macOS application bundle (`TimeOrbit.app`) with custom `Info.plist` and executable launcher script on `macos-latest`.
+  - **📱 Apple iOS (iPhone & iPad)**: Generates complete Apple touch PWA integration and home screen web clip guide, plus Xcode runner capability.
+  - Generates downloadable GitHub Actions build artifacts on every workflow trigger or push.
 
 ### 🧠 Architectural Analysis: Token Bucket vs. Apache Kafka
 
@@ -212,8 +294,8 @@ flowchart TD
 | **Rate Limiting Engine** | Custom Token Bucket Limiter | $O(1)$ continuous mathematical replenishment with burst handling & LRU eviction |
 | **Icons** | [Lucide React](https://lucide.dev/) | Clean, consistent SVG icon set |
 | **Database** | [MongoDB](https://www.mongodb.com/) via [Mongoose 8](https://mongoosejs.com/) | Document persistence with pooled connections |
-| **Security** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | JWT session verification & salted password hashing |
-| **Testing** | Node ESM / [Vitest](https://vitest.dev/) | **72 automated unit, integration, and scenario tests** |
+| **Security** | [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) & [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | Edge Auth Middleware, JWT session verification, auth rate limiting & salted password hashing |
+| **Testing** | Node ESM / [Vitest](https://vitest.dev/) | **82 automated unit, integration, and scenario tests (100% pass rate)** |
 
 ---
 
@@ -465,7 +547,40 @@ Returns aggregated API usage statistics, latency benchmarks, and endpoint breakd
 
 ---
 
-### 5. Rate Limiting Engines (Token Bucket vs Sliding Window)
+### 5. Deployment Health Check (`GET /api/health`)
+
+Production uptime and subsystem health probe. **Public endpoint (no authentication required).**
+
+**Example Request:**
+```bash
+curl -X GET "https://timeorbit-chi.vercel.app/api/health"
+```
+
+**Example Response (`200 OK`):**
+```json
+{
+  "status": "healthy",
+  "service": "TimeOrbit Planetary Observatory API",
+  "version": "1.0.0",
+  "timestamp": "2026-11-16T06:30:00.000Z",
+  "uptimeSeconds": 28410,
+  "environment": "production",
+  "database": {
+    "status": "connected",
+    "latencyMs": 12
+  },
+  "system": {
+    "memoryHeapUsedMB": 42.1,
+    "memoryRssMB": 98.4,
+    "nodeVersion": "v20.x"
+  },
+  "totalDurationMs": 13
+}
+```
+
+---
+
+### 6. Rate Limiting Engines (Token Bucket vs Sliding Window)
 
 TimeOrbit supports two rate-limiting architectures, configurable via the `RATE_LIMIT_ALGORITHM` environment variable:
 
@@ -523,20 +638,20 @@ npm test
 
 ### Test Architecture
 
-The test harness executes **72 deterministic tests** across 5 test suites without external database dependencies:
+The test harness executes **82 deterministic tests** across 6 test suites without external database dependencies:
 
 ```
 ================================================================
-GRAND TOTAL TEST SUMMARY: 72 PASSED, 0 FAILED
+GRAND TOTAL TEST SUMMARY: 82 PASSED, 0 FAILED
 ================================================================
 ```
 
 | Suite | Focus Areas |
 |---|---|
-| **`timeEngine.test.mjs`** | UTC conversions, negative offsets, fractional offsets (`+05:30`), leap year (`2024-02-29`), midnight boundaries, solar elevations. |
+| **`timeEngine.test.mjs`** | UTC conversions, negative offsets, fractional offsets (`+05:30`), leap year (`2024-02-29`), midnight boundaries, solar elevations, milestone calculations, holiday schedules. |
 | **`apiKey.test.mjs`** | `to_live_` key generation, SHA-256 hashing, status checks (`pending`, `approved`, `revoked`), rolling 60s rate limit enforcement. |
 | **`tokenBucket.test.mjs`** | $O(1)$ token consumption, rapid burst capacity, continuous elapsed-time replenishment, burst multipliers, variable costs, tenant isolation, and stale key LRU eviction. |
-| **`endpoints.test.mjs`** | In-memory REST testing of `/api/v1/time`, `/api/v1/compare`, and `/api/v1/zones` with header validations. |
+| **`endpoints.test.mjs`** | In-memory REST testing of `/api/v1/time`, `/api/v1/compare`, `/api/v1/zones`, and `/api/health` with header validations. |
 | **`analytics_empirical_challenge.mjs`** | Dual-mode auth validation, role scoping (`me` vs `global`), range validation (`24h`, `7d`, `30d`), CORS preflights, zero-division resilience. |
 | **`adversarial_telemetry_stress.mjs`** | High-volume traffic simulation (100k requests), UI chart scaling, race-condition mitigation with `AbortController`. |
 
@@ -560,6 +675,7 @@ TimeOrbit/
 │   └── workflows/
 │       └── build-apps.yml           # CI/CD: Android APK & Windows Wallpaper release builder
 ├── public/                          # Static assets and favicons
+│   ├── manifest.json                # PWA web app manifest
 │   └── sw.js                        # PWA Offline Service Worker
 ├── wallpaper/                       # Standalone Windows desktop live wallpaper
 │   ├── index.html                   # Offline WebGL 3D Earth live wallpaper
@@ -569,27 +685,43 @@ TimeOrbit/
 │   ├── app/
 │   │   ├── page.tsx                 # Homepage with 3D globe & live city clocks
 │   │   ├── compare/page.tsx         # Timezone comparison matrix & scrubber
+│   │   ├── clock/page.tsx           # Digital chronometer, observatories, stopwatch & timer
+│   │   ├── calendar/page.tsx        # Chrono calendar, milestones, holidays & ICS export
 │   │   ├── wallpaper/page.tsx       # Dedicated clean web wallpaper route
 │   │   ├── docs/page.tsx            # Interactive REST API sandbox & docs
 │   │   ├── dashboard/page.tsx       # Developer key management & analytics
 │   │   ├── admin/page.tsx           # Admin key approval & global telemetry
+│   │   ├── error/page.tsx           # Diagnostic lab for all error states & batch toast
 │   │   ├── login/page.tsx           # User authentication
-│   │   ├── register/page.tsx        # User registration
+│   │   ├── register/page.tsx        # User registration with 18+ verification
+│   │   ├── loading.tsx              # Observatory React Suspense loading skeleton
+│   │   ├── unauthorized.tsx         # HTTP 401 Unauthorized screen
+│   │   ├── forbidden.tsx            # HTTP 403 Forbidden clearance screen
+│   │   ├── not-found.tsx            # HTTP 404 Trajectory not found screen
+│   │   ├── error.tsx                # Client-side Next.js route error boundary
+│   │   ├── global-error.tsx         # Root layout fallback error boundary
+│   │   ├── robots.ts                # Dynamic search crawler robots.txt
+│   │   ├── sitemap.ts               # Dynamic search engine sitemap.xml
 │   │   └── api/
 │   │       ├── v1/
 │   │       │   ├── time/route.ts    # GET /api/v1/time
 │   │       │   ├── compare/route.ts # GET /api/v1/compare
 │   │       │   └── zones/route.ts   # GET /api/v1/zones
+│   │       ├── health/route.ts      # GET /api/health (Deployment health check)
 │   │       ├── analytics/route.ts   # GET /api/analytics
 │   │       ├── keys/route.ts        # POST/GET/DELETE API key management
 │   │       ├── auth/                # Login, register, logout handlers
 │   │       └── admin/               # Admin review and key status endpoints
+│   ├── middleware.ts                # Next.js Edge Auth Middleware gatekeeper
 │   ├── components/
-│   │   ├── globe/
-│   │   │   └── GlobeCanvas.tsx      # Interactive 3D WebGL globe canvas
+│   │   ├── auth/                    # AgeVerificationModal compliance gate
+│   │   ├── globe/                   # Interactive 3D WebGL globe canvas (GlobeCanvas.tsx)
+│   │   ├── iss/                     # ISS Flyover pass radar & calculation modals
 │   │   └── layout/
-│   │       ├── Navbar.tsx           # Global navigation with active auth state
+│   │       ├── Navbar.tsx           # Single-line floating capsule navigation
 │   │       └── Footer.tsx           # Global footer
+│   ├── context/
+│   │   └── ToastContext.tsx         # Universal Batch Toast Notification Engine
 │   ├── lib/
 │   │   ├── timeEngine.ts            # Solar & timezone computational engine
 │   │   ├── cities.ts                # Catalog of 70+ global cities and GPS resolver

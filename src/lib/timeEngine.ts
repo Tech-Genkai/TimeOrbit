@@ -1,4 +1,12 @@
-import { CityData, TimeDetail, ComparisonResult } from '@/types';
+import {
+  CityData,
+  TimeDetail,
+  ComparisonResult,
+  MultiCityComparisonResult,
+  ISSPassPrediction,
+  SolarElevationShadowData,
+  ICalendarEvent,
+} from '@/types';
 
 /**
  * Pure local calculation of solar elevation angle
@@ -714,4 +722,653 @@ export function generateCalendarMeetingLinks(
     icsContent: ics,
     icsFileName: `meeting-${cityA.city.toLowerCase()}-${cityB.city.toLowerCase()}.ics`,
   };
+}
+
+/**
+ * Calculates solar elevation, azimuth, shadow length factor, and UV irradiance estimate
+ */
+export function getSolarElevationAndShadow(
+  lat: number,
+  lng: number,
+  date: Date = new Date()
+): SolarElevationShadowData {
+  const dayOfYear = Math.floor(
+    (date.getTime() - new Date(date.getUTCFullYear(), 0, 0).getTime()) / 86400000
+  );
+  const declination = 23.45 * Math.sin(((2 * Math.PI) / 365) * (dayOfYear - 81)) * (Math.PI / 180);
+  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+  const solarTime = (utcHours + lng / 15 + 24) % 24;
+  const hourAngle = (solarTime - 12) * 15 * (Math.PI / 180);
+  const latRad = lat * (Math.PI / 180);
+
+  const sinAltitude =
+    Math.sin(latRad) * Math.sin(declination) +
+    Math.cos(latRad) * Math.cos(declination) * Math.cos(hourAngle);
+  const altitudeDeg = Number((Math.asin(Math.max(-1, Math.min(1, sinAltitude))) * (180 / Math.PI)).toFixed(1));
+
+  const cosAzimuth =
+    (Math.sin(declination) - Math.sin(latRad) * sinAltitude) /
+    (Math.cos(latRad) * Math.cos(altitudeDeg * (Math.PI / 180)) || 0.0001);
+  let azimuthDeg = Math.acos(Math.max(-1, Math.min(1, cosAzimuth))) * (180 / Math.PI);
+  if (hourAngle > 0) azimuthDeg = 360 - azimuthDeg;
+  azimuthDeg = Math.round((azimuthDeg + 360) % 360);
+
+  let shadowLengthFactor: number | null = null;
+  let shadowDescription = 'Sun is below horizon (Night); no direct solar shadows cast.';
+
+  if (altitudeDeg > 0.5) {
+    const factor = 1 / Math.tan(altitudeDeg * (Math.PI / 180));
+    shadowLengthFactor = Number(factor.toFixed(2));
+    const shadowDir = degreesToCompass((azimuthDeg + 180) % 360);
+    shadowDescription = `A 1.0m vertical object casts a ${shadowLengthFactor}m shadow pointing ${shadowDir}.`;
+  } else if (altitudeDeg > 0) {
+    shadowLengthFactor = 99.9;
+    shadowDescription = 'Sun is skimming the horizon; shadows are extremely elongated.';
+  }
+
+  const solarZenithAngleDeg = Number(Math.max(0, 90 - altitudeDeg).toFixed(1));
+  const uvIndexEstimate = altitudeDeg > 0 ? Number((Math.sin(altitudeDeg * (Math.PI / 180)) * 10.5).toFixed(1)) : 0;
+
+  return {
+    altitudeDeg,
+    azimuthDeg,
+    azimuthCompass: degreesToCompass(azimuthDeg),
+    shadowLengthFactor,
+    shadowDescription,
+    solarZenithAngleDeg,
+    uvIndexEstimate,
+  };
+}
+
+/**
+ * Predicts upcoming visible orbital passes of the International Space Station (ISS)
+ * for any given observer coordinates over the next 48 hours.
+ */
+export function calculateISSPasses(
+  observerLat: number,
+  observerLng: number,
+  fromDate: Date = new Date(),
+  maxPasses = 5
+): ISSPassPrediction[] {
+  const passes: ISSPassPrediction[] = [];
+  const R_EARTH = 6371; // km
+  const obsLatRad = (observerLat * Math.PI) / 180;
+  const obsLngRad = (observerLng * Math.PI) / 180;
+
+  // Observer topocentric coordinate basis (ECF-like)
+  const upX = Math.cos(obsLatRad) * Math.cos(obsLngRad);
+  const upY = Math.cos(obsLatRad) * Math.sin(obsLngRad);
+  const upZ = Math.sin(obsLatRad);
+
+  const eastX = -Math.sin(obsLngRad);
+  const eastY = Math.cos(obsLngRad);
+  const eastZ = 0;
+
+  const northX = -Math.sin(obsLatRad) * Math.cos(obsLngRad);
+  const northY = -Math.sin(obsLatRad) * Math.sin(obsLngRad);
+  const northZ = Math.cos(obsLatRad);
+
+  const obsX = R_EARTH * upX;
+  const obsY = R_EARTH * upY;
+  const obsZ = R_EARTH * upZ;
+
+  const startMs = fromDate.getTime();
+  const maxSearchMinutes = 48 * 60; // 48 hours
+  let inPass = false;
+  let currentPassStart: Date | null = null;
+  let peakElev = 0;
+  let peakTime: Date | null = null;
+  let riseAz = 0;
+  let peakAz = 0;
+  let setAz = 0;
+
+  for (let m = 0; m < maxSearchMinutes && passes.length < maxPasses; m++) {
+    const t = new Date(startMs + m * 60000);
+    const iss = getISSOrbitalPosition(t);
+    const issR = R_EARTH + iss.altitudeKm;
+    const issLatRad = (iss.lat * Math.PI) / 180;
+    const issLngRad = (iss.lng * Math.PI) / 180;
+
+    const issX = issR * Math.cos(issLatRad) * Math.cos(issLngRad);
+    const issY = issR * Math.cos(issLatRad) * Math.sin(issLngRad);
+    const issZ = issR * Math.sin(issLatRad);
+
+    const rhoX = issX - obsX;
+    const rhoY = issY - obsY;
+    const rhoZ = issZ - obsZ;
+    const rhoDist = Math.sqrt(rhoX * rhoX + rhoY * rhoY + rhoZ * rhoZ);
+
+    const upDot = (rhoX * upX + rhoY * upY + rhoZ * upZ) / rhoDist;
+    const elevDeg = Math.asin(Math.max(-1, Math.min(1, upDot))) * (180 / Math.PI);
+
+    const eastDot = rhoX * eastX + rhoY * eastY + rhoZ * eastZ;
+    const northDot = rhoX * northX + rhoY * northY + rhoZ * northZ;
+    let azDeg = Math.atan2(eastDot, northDot) * (180 / Math.PI);
+    azDeg = (azDeg + 360) % 360;
+
+    if (elevDeg >= 10) {
+      if (!inPass) {
+        inPass = true;
+        currentPassStart = t;
+        peakElev = elevDeg;
+        peakTime = t;
+        riseAz = azDeg;
+        peakAz = azDeg;
+      } else {
+        if (elevDeg > peakElev) {
+          peakElev = elevDeg;
+          peakTime = t;
+          peakAz = azDeg;
+        }
+      }
+    } else {
+      if (inPass && currentPassStart && peakTime) {
+        setAz = azDeg;
+        const endTime = t;
+        const durationSeconds = Math.round((endTime.getTime() - currentPassStart.getTime()) / 1000);
+
+        // Check solar state for observer and ISS
+        const obsSolarState = calculateSolarState(observerLat, observerLng, peakTime);
+        const observerNight = obsSolarState === 'night' || obsSolarState === 'dawn' || obsSolarState === 'dusk';
+
+        // Check if ISS at peak is in sunlight (subsolar distance)
+        const subsolar = getSubsolarPoint(peakTime);
+        const issPeakPos = getISSOrbitalPosition(peakTime);
+        const geoDist = calculateGeodesicDistance(subsolar.lat, subsolar.lng, issPeakPos.lat, issPeakPos.lng);
+        const isSunlit = geoDist.angularDegrees < 118; // Atmospheric twilight cutoff for 418km
+
+        let visibility: 'Naked Eye (Twilight)' | 'Daylight Pass' | 'Night (In Shadow)' = 'Night (In Shadow)';
+        let apparentMagnitude = -1.5;
+
+        if (observerNight && isSunlit) {
+          visibility = 'Naked Eye (Twilight)';
+          apparentMagnitude = Number((-1.8 - (peakElev / 90) * 1.5).toFixed(1));
+        } else if (!observerNight) {
+          visibility = 'Daylight Pass';
+          apparentMagnitude = -0.5;
+        }
+
+        passes.push({
+          id: `iss-pass-${currentPassStart.getTime()}`,
+          startTime: currentPassStart,
+          endTime,
+          maxElevationTime: peakTime,
+          maxElevationDeg: Math.round(peakElev),
+          durationSeconds,
+          durationMinutes: Number((durationSeconds / 60).toFixed(1)),
+          riseCompass: degreesToCompass(riseAz),
+          setCompass: degreesToCompass(setAz),
+          peakCompass: degreesToCompass(peakAz),
+          visibility,
+          isSunlit,
+          observerNight,
+          apparentMagnitude,
+        });
+
+        inPass = false;
+        currentPassStart = null;
+        peakElev = 0;
+        peakTime = null;
+      }
+    }
+  }
+
+  return passes;
+}
+
+/**
+ * Compares 2 to 5 cities simultaneously and identifies optimal overlapping
+ * business ("Golden Hour") and waking windows.
+ */
+export function compareMultiCities(
+  cities: CityData[],
+  targetDate: Date = new Date()
+): MultiCityComparisonResult {
+  const cityTimes = cities.map((c) => getCityTime(c, targetDate));
+
+  const timeline24h = [];
+  let overlapWorkingCount = 0;
+  let bestUtcHour: number | null = null;
+  let maxWorkingInSlot = -1;
+
+  for (let utcHour = 0; utcHour < 24; utcHour++) {
+    const statuses = cityTimes.map((ct) => {
+      const localHour = (utcHour + Math.round(ct.utcOffsetMinutes / 60) + 24) % 24;
+      const period = localHour >= 12 ? 'PM' : 'AM';
+      const displayHour = localHour % 12 === 0 ? 12 : localHour % 12;
+      const localFormatted = `${displayHour}:00 ${period}`;
+
+      let state: 'working' | 'extended' | 'sleeping' = 'sleeping';
+      if (localHour >= 9 && localHour < 18) {
+        state = 'working';
+      } else if ((localHour >= 8 && localHour < 9) || (localHour >= 18 && localHour < 22)) {
+        state = 'extended';
+      }
+
+      return {
+        city: ct.city,
+        localHour,
+        localFormatted,
+        state,
+      };
+    });
+
+    const isAllWorking = statuses.every((s) => s.state === 'working');
+    const isAllAwake = statuses.every((s) => s.state !== 'sleeping');
+    const workingCount = statuses.filter((s) => s.state === 'working').length;
+
+    if (isAllWorking) overlapWorkingCount++;
+    if (workingCount > maxWorkingInSlot) {
+      maxWorkingInSlot = workingCount;
+      bestUtcHour = utcHour;
+    }
+
+    const utcPeriod = utcHour >= 12 ? 'PM' : 'AM';
+    const utcDisplay = utcHour % 12 === 0 ? 12 : utcHour % 12;
+
+    timeline24h.push({
+      utcHour,
+      utcFormatted: `${utcDisplay}:00 ${utcPeriod} UTC`,
+      cityStatuses: statuses,
+      isAllWorking,
+      isAllAwake,
+    });
+  }
+
+  const hasOverlap = overlapWorkingCount > 0;
+  let advice = '';
+
+  if (hasOverlap) {
+    advice = `Found ${overlapWorkingCount} universal overlapping business hours (9:00 AM – 6:00 PM) across all ${cities.length} global locations. Optimal for team synchronizations!`;
+  } else {
+    const bestHourStr = bestUtcHour !== null ? `${bestUtcHour}:00 UTC` : 'N/A';
+    advice = `No single slot has all ${cities.length} cities in standard 9-to-6 business hours. The closest alignment occurs around ${bestHourStr} when the maximum number of participants are awake.`;
+  }
+
+  return {
+    cities: cityTimes,
+    goldenHour: {
+      hasOverlap,
+      overlapHoursCount: overlapWorkingCount,
+      bestUtcHour,
+      advice,
+    },
+    timeline24h,
+  };
+}
+
+/**
+ * Calculates anniversary milestone information (years completed and traditional symbol).
+ */
+export function calculateAnniversaryMilestone(
+  yearStarted: number,
+  targetYear: number = new Date().getFullYear()
+): { years: number; milestoneName: string; formattedLabel: string } {
+  const years = Math.max(0, targetYear - yearStarted);
+
+  const symbols: Record<number, string> = {
+    1: 'Paper',
+    2: 'Cotton',
+    3: 'Leather',
+    4: 'Fruit & Flowers',
+    5: 'Wood',
+    6: 'Iron',
+    7: 'Wool',
+    8: 'Bronze',
+    9: 'Pottery',
+    10: 'Tin / Aluminum',
+    15: 'Crystal',
+    20: 'China / Porcelain',
+    25: 'Silver Jubilee',
+    30: 'Pearl Jubilee',
+    35: 'Coral',
+    40: 'Ruby Jubilee',
+    45: 'Sapphire',
+    50: 'Golden Jubilee',
+    55: 'Emerald',
+    60: 'Diamond Jubilee',
+    70: 'Platinum Jubilee',
+    75: 'Oak Jubilee',
+  };
+
+  const milestoneName = symbols[years] || (years > 0 ? `${years} Years Together` : 'Inception Year');
+  const formattedLabel = `${years}${getOrdinalSuffix(years)} Anniversary • ${milestoneName}`;
+
+  return {
+    years,
+    milestoneName,
+    formattedLabel,
+  };
+}
+
+/**
+ * Calculates birthday milestone (turning age and formatted title).
+ */
+export function calculateBirthdayMilestone(
+  birthYear: number,
+  targetYear: number = new Date().getFullYear()
+): { turningAge: number; formattedLabel: string } {
+  const turningAge = Math.max(0, targetYear - birthYear);
+  const formattedLabel = `Turning ${turningAge}${getOrdinalSuffix(turningAge)}`;
+  return { turningAge, formattedLabel };
+}
+
+function getOrdinalSuffix(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+/**
+ * Calculates days remaining until target date (with automatic rollover for recurring annual events).
+ */
+export function getDaysUntil(
+  dateStr: string,
+  isAnnualRecurring: boolean = false,
+  fromDate: Date = new Date()
+): { daysRemaining: number; isToday: boolean; isTomorrow: boolean; formatted: string } {
+  // Normalize date
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const eventMonth = parseInt(monthStr, 10) - 1;
+  const eventDay = parseInt(dayStr, 10);
+
+  const currentYear = fromDate.getFullYear();
+  let target = new Date(currentYear, eventMonth, eventDay, 0, 0, 0, 0);
+
+  const today = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0);
+
+  if (isAnnualRecurring) {
+    if (target.getTime() < today.getTime()) {
+      target = new Date(currentYear + 1, eventMonth, eventDay, 0, 0, 0, 0);
+    }
+  } else {
+    // Non-recurring exact date
+    const origYear = parseInt(yearStr, 10);
+    target = new Date(origYear, eventMonth, eventDay, 0, 0, 0, 0);
+  }
+
+  const diffMs = target.getTime() - today.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  const isToday = diffDays === 0;
+  const isTomorrow = diffDays === 1;
+
+  let formatted = '';
+  if (isToday) {
+    formatted = 'Today!';
+  } else if (isTomorrow) {
+    formatted = 'Tomorrow';
+  } else if (diffDays > 1) {
+    formatted = `In ${diffDays} days`;
+  } else if (diffDays === -1) {
+    formatted = 'Yesterday';
+  } else {
+    formatted = `${Math.abs(diffDays)} days ago`;
+  }
+
+  return {
+    daysRemaining: diffDays,
+    isToday,
+    isTomorrow,
+    formatted,
+  };
+}
+
+/**
+ * Generates an RFC 5545 compliant iCalendar (.ics) string for any calendar event
+ */
+export function generateCalendarEventIcs(event: ICalendarEvent): { icsContent: string; fileName: string } {
+  const [y, m, d] = event.date.split('-');
+  const dtStart = `${y}${m}${d}`;
+  const isRecurring = event.type === 'birthday' || event.type === 'anniversary';
+  const rrule = isRecurring ? 'RRULE:FREQ=YEARLY\r\n' : '';
+  const cleanTitle = event.title.replace(/[\r\n]/g, ' ');
+  const cleanDesc = (event.description || '').replace(/[\r\n]/g, '\\n');
+  const uid = `timeorbit-${event.id}-${Date.now()}@timeorbit.app`;
+
+  const icsLines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//TimeOrbit//Chrono Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${dtStart}T090000Z`,
+    `DTSTART;VALUE=DATE:${dtStart}`,
+    `SUMMARY:${cleanTitle}`,
+    `DESCRIPTION:${cleanDesc}`,
+    'TRANSP:TRANSPARENT',
+    'STATUS:CONFIRMED',
+    rrule ? rrule.trim() : null,
+    'BEGIN:VALARM',
+    'TRIGGER:-PT15H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:Reminder: ${cleanTitle}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean);
+
+  const icsContent = icsLines.join('\r\n');
+  const safeTitle = event.title.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 24);
+  const fileName = `${safeTitle || 'event'}.ics`;
+
+  return { icsContent, fileName };
+}
+
+/**
+ * Returns key astronomical and planetary events for a given year
+ */
+export function getAstronomicalEvents(year: number = new Date().getFullYear()): ICalendarEvent[] {
+  return [
+    {
+      id: `astro-vernal-${year}`,
+      title: '🌱 Vernal Equinox (Spring)',
+      type: 'celestial',
+      date: `${year}-03-20`,
+      description: 'Equal day and night globally as Sun crosses celestial equator northbound.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `astro-summer-solstice-${year}`,
+      title: '☀️ Summer Solstice (Longest Day)',
+      type: 'celestial',
+      date: `${year}-06-21`,
+      description: 'Sun reaches its northernmost declination, giving Northern hemisphere its longest day of the year.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `astro-perseids-${year}`,
+      title: '☄️ Perseid Meteor Shower Peak',
+      type: 'celestial',
+      date: `${year}-08-12`,
+      description: 'Swift and bright meteors from Comet Swift-Tuttle, producing up to 100 meteors per hour.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `astro-autumn-equinox-${year}`,
+      title: '🍂 Autumnal Equinox (Fall)',
+      type: 'celestial',
+      date: `${year}-09-22`,
+      description: 'Sun crosses celestial equator southward; equal day and night worldwide.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `astro-geminids-${year}`,
+      title: '✨ Geminid Meteor Shower Peak',
+      type: 'celestial',
+      date: `${year}-12-14`,
+      description: 'The king of meteor showers, originating from asteroid 3200 Phaethon with multi-colored fireballs.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `astro-winter-solstice-${year}`,
+      title: '❄️ Winter Solstice (Shortest Day)',
+      type: 'celestial',
+      date: `${year}-12-21`,
+      description: 'Shortest day and longest night in Northern Hemisphere; onset of astronomical winter.',
+      createdAt: new Date().toISOString(),
+    },
+  ];
+}
+
+/**
+ * Returns key global cultural festivals and statutory public holidays for a given year
+ */
+export function getHolidaysAndFestivals(year: number = new Date().getFullYear()): ICalendarEvent[] {
+  return [
+    {
+      id: `fest-newyear-${year}`,
+      title: "🎉 New Year's Day",
+      type: 'holiday',
+      date: `${year}-01-01`,
+      description: 'Global holiday marking the arrival of the new calendar year.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-republic-day-${year}`,
+      title: '🇮🇳 Republic Day',
+      type: 'holiday',
+      date: `${year}-01-26`,
+      description: 'Commemorating the adoption of the Constitution of India in 1950.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-lunar-newyear-${year}`,
+      title: '🧧 Lunar New Year (Spring Festival)',
+      type: 'holiday',
+      date: `${year}-02-17`,
+      description: 'Major East Asian festival celebrating the new year on the lunisolar calendar.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-valentines-${year}`,
+      title: "❤️ Valentine's Day",
+      type: 'holiday',
+      date: `${year}-02-14`,
+      description: 'Global festival of love, romance, and friendship.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-holi-${year}`,
+      title: '🎨 Holi (Festival of Colors)',
+      type: 'holiday',
+      date: `${year}-03-04`,
+      description: 'Joyous spring festival celebrating love, colors, and the victory of good over evil.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-stpatricks-${year}`,
+      title: "🍀 St. Patrick's Day",
+      type: 'holiday',
+      date: `${year}-03-17`,
+      description: 'Cultural and religious celebration held on the traditional death date of Saint Patrick.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-eid-al-fitr-${year}`,
+      title: '🌙 Eid al-Fitr',
+      type: 'holiday',
+      date: `${year}-03-20`,
+      description: 'Islamic festival marking the culmination of Ramadan with feast, charity, and prayer.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-earth-day-${year}`,
+      title: '🌍 Earth Day',
+      type: 'holiday',
+      date: `${year}-04-22`,
+      description: 'Worldwide event demonstrating support for environmental sustainability and planetary ecology.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-labor-day-${year}`,
+      title: '⚒️ International Workers Day',
+      type: 'holiday',
+      date: `${year}-05-01`,
+      description: 'Celebrating the historic struggles and gains made by workers and the labor movement.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-environment-day-${year}`,
+      title: '🌱 World Environment Day',
+      type: 'holiday',
+      date: `${year}-06-05`,
+      description: 'United Nations flagship day for promoting global environmental awareness and action.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-us-indep-${year}`,
+      title: '🇺🇸 US Independence Day (4th of July)',
+      type: 'holiday',
+      date: `${year}-07-04`,
+      description: 'Federal holiday commemorating the Declaration of Independence in 1776.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-in-indep-${year}`,
+      title: '🇮🇳 Independence Day',
+      type: 'holiday',
+      date: `${year}-08-15`,
+      description: 'National holiday in India marking national independence achieved in 1947.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-gandhi-jayanti-${year}`,
+      title: '🕊️ Gandhi Jayanti (International Non-Violence Day)',
+      type: 'holiday',
+      date: `${year}-10-02`,
+      description: 'Honoring Mahatma Gandhi and the philosophy of non-violence globally.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-halloween-${year}`,
+      title: '🎃 Halloween (All Hallows Eve)',
+      type: 'holiday',
+      date: `${year}-10-31`,
+      description: 'Celebration dedicated to remembering the departed, trick-or-treating, and autumn festivities.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-diwali-${year}`,
+      title: '🪔 Diwali (Festival of Lights)',
+      type: 'holiday',
+      date: `${year}-11-08`,
+      description: 'Major festival symbolizing the spiritual victory of light over darkness and good over evil.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-thanksgiving-${year}`,
+      title: '🦃 Thanksgiving Day',
+      type: 'holiday',
+      date: `${year}-11-26`,
+      description: 'Annual national holiday for giving thanks, family gatherings, and harvest blessings.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-xmas-eve-${year}`,
+      title: '🎄 Christmas Eve',
+      type: 'holiday',
+      date: `${year}-12-24`,
+      description: 'The evening preceding Christmas Day, celebrated with festive vigils and family traditions.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-christmas-${year}`,
+      title: '🎅 Christmas Day',
+      type: 'holiday',
+      date: `${year}-12-25`,
+      description: 'Worldwide cultural and religious holiday celebrating joy, peace, and goodwill.',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: `fest-newyears-eve-${year}`,
+      title: "🥂 New Year's Eve",
+      type: 'holiday',
+      date: `${year}-12-31`,
+      description: 'The final day of the year celebrated globally with countdowns, fireworks, and festivities.',
+      createdAt: new Date().toISOString(),
+    },
+  ];
 }

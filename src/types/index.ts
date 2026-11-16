@@ -7,6 +7,8 @@ export interface IUser {
   name: string;
   email: string;
   role: UserRole;
+  dateOfBirth?: string | Date;
+  isAgeVerified?: boolean;
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -92,4 +94,75 @@ export interface ComparisonResult {
     timeToFormatted: string;
     isWorkingOverlap: boolean;
   }[];
+}
+
+export interface MultiCityComparisonResult {
+  cities: TimeDetail[];
+  goldenHour: {
+    hasOverlap: boolean;
+    overlapHoursCount: number;
+    bestUtcHour: number | null;
+    advice: string;
+  };
+  timeline24h: {
+    utcHour: number;
+    utcFormatted: string;
+    cityStatuses: {
+      city: string;
+      localHour: number;
+      localFormatted: string;
+      state: 'working' | 'extended' | 'sleeping';
+    }[];
+    isAllWorking: boolean;
+    isAllAwake: boolean;
+  }[];
+}
+
+export interface ISSPassPrediction {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  maxElevationTime: Date;
+  maxElevationDeg: number;
+  durationSeconds: number;
+  durationMinutes: number;
+  riseCompass: string;
+  setCompass: string;
+  peakCompass: string;
+  visibility: 'Naked Eye (Twilight)' | 'Daylight Pass' | 'Night (In Shadow)';
+  isSunlit: boolean;
+  observerNight: boolean;
+  apparentMagnitude: number;
+}
+
+export interface SolarElevationShadowData {
+  altitudeDeg: number;
+  azimuthDeg: number;
+  azimuthCompass: string;
+  shadowLengthFactor: number | null;
+  shadowDescription: string;
+  solarZenithAngleDeg: number;
+  uvIndexEstimate: number;
+}
+
+export type CalendarEventType = 'birthday' | 'anniversary' | 'reminder' | 'celestial' | 'holiday';
+
+export interface ICalendarEvent {
+  id: string;
+  title: string;
+  type: CalendarEventType;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm (optional, for reminders)
+  description?: string;
+  personName?: string; // for birthday / anniversary
+  yearStarted?: number; // birth year or anniversary start year
+  priority?: 'low' | 'medium' | 'high';
+  isCompleted?: boolean; // for reminders
+  createdAt: string;
+}
+
+export interface IStopwatchLap {
+  id: number;
+  lapTime: number; // ms
+  overallTime: number; // ms
 }

@@ -1,5 +1,18 @@
 import assert from 'node:assert';
-import { getCityTime, calculateSolarState, compareCities } from '@/lib/timeEngine';
+import {
+  getCityTime,
+  calculateSolarState,
+  compareCities,
+  compareMultiCities,
+  calculateISSPasses,
+  getSolarElevationAndShadow,
+  calculateAnniversaryMilestone,
+  calculateBirthdayMilestone,
+  getDaysUntil,
+  generateCalendarEventIcs,
+  getAstronomicalEvents,
+  getHolidaysAndFestivals,
+} from '@/lib/timeEngine';
 import { CITIES, findCity } from '@/lib/cities';
 
 export async function runTimeEngineTests() {
@@ -109,6 +122,132 @@ export async function runTimeEngineTests() {
     assert(typeof result.workingHoursOverlap.hasOverlap === 'boolean');
     assert(typeof result.workingHoursOverlap.overlapHours === 'number');
     assert(typeof result.workingHoursOverlap.advice === 'string');
+  });
+
+  // --- 4. calculateISSPasses ---
+  test('calculateISSPasses returns upcoming orbital passes with valid elevation angles', () => {
+    const tokyo = findCity('Tokyo');
+    assert(tokyo, 'Tokyo should exist');
+    const passes = calculateISSPasses(tokyo.lat, tokyo.lng, new Date('2026-06-15T00:00:00Z'), 3);
+
+    assert(Array.isArray(passes), 'Passes should be an array');
+    assert(passes.length > 0, 'Should predict at least 1 pass in 48 hours');
+    const firstPass = passes[0];
+    assert(firstPass.maxElevationDeg >= 10, 'Pass elevation should meet or exceed 10° threshold');
+    assert(firstPass.durationSeconds > 0, 'Duration should be positive');
+    assert(typeof firstPass.riseCompass === 'string', 'Rise compass should be string');
+    assert(typeof firstPass.setCompass === 'string', 'Set compass should be string');
+    assert(['Naked Eye (Twilight)', 'Daylight Pass', 'Night (In Shadow)'].includes(firstPass.visibility));
+  });
+
+  // --- 5. compareMultiCities ---
+  test('compareMultiCities evaluates 3 global cities and identifies golden hour matrix', () => {
+    const tokyo = findCity('Tokyo');
+    const london = findCity('London');
+    const ny = findCity('New York');
+    assert(tokyo && london && ny, 'All 3 cities must exist');
+
+    const result = compareMultiCities([tokyo, london, ny], new Date('2026-06-15T12:00:00Z'));
+    assert.strictEqual(result.cities.length, 3, 'Should format 3 city times');
+    assert.strictEqual(result.timeline24h.length, 24, 'Timeline should have 24 hours');
+    assert(typeof result.goldenHour.hasOverlap === 'boolean', 'Has overlap boolean');
+    assert(typeof result.goldenHour.advice === 'string', 'Golden hour advice string');
+  });
+
+  // --- 6. getSolarElevationAndShadow ---
+  test('getSolarElevationAndShadow computes altitude, azimuth, and shadow factor', () => {
+    const noonSolar = getSolarElevationAndShadow(0, 0, new Date('2026-03-21T12:00:00Z')); // Equinox noon at (0,0)
+    assert(noonSolar.altitudeDeg > 80, 'Equinox noon on equator should have high altitude > 80°');
+    assert(noonSolar.shadowLengthFactor !== null, 'Day shadow factor should be non-null');
+    assert(noonSolar.shadowLengthFactor < 0.3, 'Nearly vertical sun should have very short shadow');
+
+    const nightSolar = getSolarElevationAndShadow(0, 0, new Date('2026-03-21T00:00:00Z'));
+    assert(nightSolar.altitudeDeg < 0, 'Midnight should have negative solar altitude');
+    assert.strictEqual(nightSolar.shadowLengthFactor, null, 'Night shadow factor should be null');
+  });
+
+  // --- 7. calculateAnniversaryMilestone & calculateBirthdayMilestone ---
+  test('calculateAnniversaryMilestone identifies milestones and symbols accurately', () => {
+    const m5 = calculateAnniversaryMilestone(2021, 2026);
+    assert.strictEqual(m5.years, 5);
+    assert.strictEqual(m5.milestoneName, 'Wood');
+    assert(m5.formattedLabel.includes('5th Anniversary • Wood'));
+
+    const m25 = calculateAnniversaryMilestone(2001, 2026);
+    assert.strictEqual(m25.years, 25);
+    assert.strictEqual(m25.milestoneName, 'Silver Jubilee');
+  });
+
+  test('calculateBirthdayMilestone calculates turning age and ordinal labels', () => {
+    const bday = calculateBirthdayMilestone(1996, 2026);
+    assert.strictEqual(bday.turningAge, 30);
+    assert.strictEqual(bday.formattedLabel, 'Turning 30th');
+
+    const bday21 = calculateBirthdayMilestone(2005, 2026);
+    assert.strictEqual(bday21.turningAge, 21);
+    assert.strictEqual(bday21.formattedLabel, 'Turning 21st');
+  });
+
+  // --- 8. getDaysUntil & Rollover ---
+  test('getDaysUntil handles today, tomorrow, and annual rollover correctly', () => {
+    const baseDate = new Date('2026-05-10T12:00:00Z');
+    
+    // Today
+    const todayRes = getDaysUntil('2026-05-10', false, baseDate);
+    assert.strictEqual(todayRes.isToday, true);
+    assert.strictEqual(todayRes.formatted, 'Today!');
+
+    // Tomorrow
+    const tmrwRes = getDaysUntil('2026-05-11', false, baseDate);
+    assert.strictEqual(tmrwRes.isTomorrow, true);
+    assert.strictEqual(tmrwRes.formatted, 'Tomorrow');
+
+    // In 5 days
+    const futureRes = getDaysUntil('2026-05-15', false, baseDate);
+    assert.strictEqual(futureRes.daysRemaining, 5);
+    assert.strictEqual(futureRes.formatted, 'In 5 days');
+
+    // Annual recurrence rollover (past date rolls over to next year)
+    const passedBday = getDaysUntil('2026-01-01', true, baseDate);
+    assert(passedBday.daysRemaining > 200, 'Past recurring event should roll to next year');
+  });
+
+  // --- 9. generateCalendarEventIcs & getAstronomicalEvents ---
+  test('generateCalendarEventIcs generates valid RFC 5545 iCalendar content', () => {
+    const event = {
+      id: 'test-event-1',
+      title: 'Our Wedding Anniversary',
+      type: 'anniversary',
+      date: '2026-06-25',
+      description: 'Celebrating 5 wonderful years!',
+      createdAt: '2026-01-01T00:00:00Z',
+    };
+    const { icsContent, fileName } = generateCalendarEventIcs(event);
+    assert(icsContent.includes('BEGIN:VCALENDAR'));
+    assert(icsContent.includes('BEGIN:VEVENT'));
+    assert(icsContent.includes('SUMMARY:Our Wedding Anniversary'));
+    assert(icsContent.includes('RRULE:FREQ=YEARLY'));
+    assert(icsContent.includes('END:VCALENDAR'));
+    assert(fileName.endsWith('.ics'));
+  });
+
+  test('getAstronomicalEvents provides accurate equinoxes and solstices for year', () => {
+    const astro = getAstronomicalEvents(2026);
+    assert(astro.length >= 6, 'Should provide at least 6 astronomical events');
+    const equinox = astro.find(e => e.title.includes('Vernal Equinox'));
+    assert(equinox, 'Vernal Equinox should be present');
+    assert.strictEqual(equinox.date, '2026-03-20');
+  });
+
+  test('getHolidaysAndFestivals provides global festivals and public holidays', () => {
+    const fests = getHolidaysAndFestivals(2026);
+    assert(fests.length >= 15, 'Should provide at least 15 holidays/festivals');
+    const diwali = fests.find(f => f.title.includes('Diwali'));
+    assert(diwali, 'Diwali should be present');
+    assert.strictEqual(diwali.type, 'holiday');
+    const xmas = fests.find(f => f.title.includes('Christmas Day'));
+    assert(xmas, 'Christmas Day should be present');
+    assert.strictEqual(xmas.date, '2026-12-25');
   });
 
   return { passed, failed };
