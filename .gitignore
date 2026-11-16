@@ -19,10 +19,14 @@
 
 # production
 /build
+/dist/
+/dist-*/
 
 # misc
 .DS_Store
 *.pem
+*.keystore
+*.jks
 Thumbs.db
 
 # debug
@@ -52,3 +56,23 @@ next-env.d.ts
 .idea/
 *.swp
 *.swo
+
+# ==========================================
+# Rust & Tauri Builds
+# ==========================================
+src-tauri/target/
+src-tauri/gen/
+
+# ==========================================
+# Android & Gradle Builds
+# ==========================================
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+.gradle/
+*.apk
+*.aab
+*.apks
+*.xapk
+*.apkm
