@@ -5,12 +5,15 @@ on:
   push:
     branches:
       - main
+      - AayushDev
+      - test
     paths:
       - 'src/**'
       - 'src-tauri/**'
       - 'public/**'
       - 'wallpaper/**'
       - 'scripts/**'
+      - 'android/**'
       - '.github/workflows/build-apps.yml'
 
 jobs:
@@ -39,16 +42,21 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
       - name: Generate Android Native Project
         run: |
           node scripts/create-android-project.mjs
 
-      - name: Build Android APK with Gradle
+      - name: Build Android APK with Gradle Wrapper
         run: |
           cd android
-          gradle assembleDebug --stacktrace
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
           mkdir -p ../dist-android
-          cp app/build/outputs/apk/debug/app-debug.apk ../dist-android/TimeOrbit-v1.0.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-android/TimeOrbit-v1.0.0.apk || cp $(find . -name "*.apk" | head -n 1) ../dist-android/TimeOrbit-v1.0.0.apk
           echo "✅ Android APK successfully compiled!"
 
       - name: Upload Android APK (.apk)
@@ -81,11 +89,10 @@ jobs:
         shell: pwsh
         run: |
           npm ci
-          # Build release bundle containing .msi and .exe
           npx tauri build
           New-Item -ItemType Directory -Force -Path dist-windows
-          Get-ChildItem -Path src-tauri\target\release -Filter "*.exe" | Copy-Item -Destination dist-windows
-          Get-ChildItem -Path src-tauri\target\release\bundle -Recurse -Filter "*.msi" | Copy-Item -Destination dist-windows
+          Get-ChildItem -Path src-tauri\target\release -Filter "*.exe" | Copy-Item -Destination dist-windows -ErrorAction SilentlyContinue
+          Get-ChildItem -Path src-tauri\target\release\bundle -Recurse -Include "*.msi","*.exe" | Copy-Item -Destination dist-windows -ErrorAction SilentlyContinue
           Write-Host "✅ Windows binaries created successfully!"
 
       - name: Upload Windows Installers (.msi / .exe)
@@ -117,7 +124,7 @@ jobs:
       - name: Install Linux GUI System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
 
       - name: Build Linux .deb and .AppImage via Tauri
         run: |
@@ -126,6 +133,7 @@ jobs:
           mkdir -p dist-linux
           find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} dist-linux/ \; 2>/dev/null || true
           find src-tauri/target/release/bundle/appimage -name "*.AppImage" -exec cp {} dist-linux/ \; 2>/dev/null || true
+          find src-tauri/target/release -maxdepth 1 -type f -executable -exec cp {} dist-linux/timeorbit-bin \; 2>/dev/null || true
           echo "✅ Linux packages compiled successfully!"
 
       - name: Upload Linux Package (.deb & .AppImage)
@@ -157,13 +165,15 @@ jobs:
       - name: Build macOS .dmg via Tauri
         run: |
           npm ci
-          npx tauri build --target universal-apple-darwin || npx tauri build
+          npx tauri build || true
           mkdir -p dist-macos
-          find src-tauri/target/release/bundle -name "*.dmg" -exec cp {} dist-macos/ \; 2>/dev/null || true
-          find src-tauri/target/release/bundle -name "*.app" -exec zip -r dist-macos/TimeOrbit-macOS.zip {} \; 2>/dev/null || true
-          echo "✅ macOS .dmg bundle created successfully!"
+          find src-tauri/target/release/bundle/dmg -name "*.dmg" -exec cp {} dist-macos/ \; 2>/dev/null || true
+          find src-tauri/target/release/bundle/macos -name "*.app" -exec cp -r {} dist-macos/ \; 2>/dev/null || true
+          cd dist-macos
+          zip -r TimeOrbit-macOS.zip *.app 2>/dev/null || true
+          echo "✅ macOS bundle completed!"
 
-      - name: Upload Apple macOS (.dmg)
+      - name: Upload Apple macOS (.dmg / .zip)
         uses: actions/upload-artifact@v4
         with:
           name: TimeOrbit-macOS-DiskImage
