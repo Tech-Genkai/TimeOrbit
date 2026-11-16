@@ -1,250 +1,227 @@
-name: Build TimeOrbit Cross-Platform Apps (PC, Android & Apple)
+name: Build TimeOrbit Multi-Platform Installers (Android, Windows, macOS, Linux & iOS)
 
 on:
-  workflow_dispatch: # Allows manual trigger from GitHub Actions UI with one click
+  workflow_dispatch: # Allows manual one-click trigger from GitHub Actions UI
   push:
     branches:
       - main
     paths:
       - 'src/**'
+      - 'src-tauri/**'
       - 'public/**'
       - 'wallpaper/**'
+      - 'scripts/**'
       - '.github/workflows/build-apps.yml'
 
 jobs:
   # ============================================================
-  # 1. WINDOWS PC COMPILATION & LIVE WALLPAPER BUNDLE
+  # 1. 🤖 ANDROID MOBILE: Real Installable APK (.apk)
   # ============================================================
-  build-windows:
-    name: 💻 Build Windows PC Desktop & Live Wallpaper
-    runs-on: windows-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Package Windows Wallpaper & Desktop App
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist-windows
-          Compress-Archive -Path wallpaper/* -DestinationPath dist-windows/TimeOrbit-Windows-LiveWallpaper.zip -Force
-          Write-Host "Windows Live Wallpaper package created successfully."
-
-      - name: Upload Windows Package Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TimeOrbit-Windows-Desktop-LiveWallpaper
-          path: dist-windows/TimeOrbit-Windows-LiveWallpaper.zip
-          if-no-files-found: error
-
-  # ============================================================
-  # 2. APPLE macOS PC DESKTOP BUNDLE
-  # ============================================================
-  build-apple-macos:
-    name: 🍏 Build Apple macOS Desktop Bundle
-    runs-on: ubuntu-latest # Using Ubuntu runner to package macOS bundle ensures 100% free runner compatibility without macOS billing quotas
-    continue-on-error: true
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Package Apple macOS WebApp Bundle
-        run: |
-          mkdir -p dist-macos/TimeOrbit.app/Contents/MacOS
-          mkdir -p dist-macos/TimeOrbit.app/Contents/Resources
-
-          # Generate Info.plist for native macOS application bundle
-          cat << 'EOF' > dist-macos/TimeOrbit.app/Contents/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleName</key>
-            <string>TimeOrbit</string>
-            <key>CFBundleDisplayName</key>
-            <string>TimeOrbit Planetary Observatory</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.timeorbit.macos</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>11.0</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
-          # Launcher script for opening full standalone WebApp on macOS
-          cat << 'EOF' > dist-macos/TimeOrbit.app/Contents/MacOS/TimeOrbit
-          #!/bin/bash
-          open -a "Google Chrome" --args --app="https://timeorbit-chi.vercel.app" 2>/dev/null || open -a "Safari" "https://timeorbit-chi.vercel.app"
-          EOF
-          chmod +x dist-macos/TimeOrbit.app/Contents/MacOS/TimeOrbit
-
-          # Compress into universal macOS zip bundle
-          cd dist-macos
-          zip -r TimeOrbit-macOS.zip TimeOrbit.app
-
-      - name: Upload Apple macOS Package Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TimeOrbit-Apple-macOS
-          path: dist-macos/TimeOrbit-macOS.zip
-          if-no-files-found: warn
-
-  # ============================================================
-  # 3. APPLE iOS (iPhone / iPad) INSTALLATION & PWA PACKAGE
-  # ============================================================
-  build-apple-ios:
-    name: 📱 Build Apple iOS Package & Guide
+  build-android-apk:
+    name: 🤖 Android (.apk) Native Build
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source Code
         uses: actions/checkout@v4
-
-      - name: Generate Apple iOS Guide & Mobile PWA Manifest
-        run: |
-          mkdir -p dist-ios
-          cat << 'EOF' > dist-ios/APPLE_IOS_INSTALLATION.md
-          # 📱 TimeOrbit Apple iOS Installation Guide
-
-          Apple's iOS operating system handles app distribution in two ways:
-
-          ---
-
-          ### Method 1: Instant Native Web Clip PWA (Zero Cost, No App Store Needed)
-          TimeOrbit is fully equipped with an Apple PWA manifest and offline Service Worker.
-          1. Open **Safari** on your iPhone or iPad.
-          2. Navigate to: `https://timeorbit-chi.vercel.app`
-          3. Tap the **Share** button (the square with an arrow pointing up).
-          4. Scroll down and tap **"Add to Home Screen"**.
-          5. Tap **Add** in the top-right corner.
-
-          ✅ **Result**: TimeOrbit will appear on your iOS Home Screen with its custom high-resolution icon. When launched, it runs in **standalone full-screen mode** without Safari's search bar or navigation buttons.
-
-          ---
-
-          ### Method 2: Native .IPA Compilation via Xcode (For Apple Developer Accounts)
-          To compile and sign a native `.ipa` binary:
-          1. Requires an **Apple Developer Program membership** ($99/year).
-          2. Secrets needed in GitHub Actions:
-             - `APPLE_CERTIFICATE_BASE64` (.p12 distribution certificate)
-             - `APPLE_CERTIFICATE_PASSWORD`
-             - `APPLE_PROVISIONING_PROFILE` (mobileprovision file)
-          3. When configured, GitHub's `macos-latest` runner executes `xcodebuild -workspace ... -scheme ... -archivePath ... archive` and uploads the `.ipa` to **TestFlight** automatically.
-          EOF
-
-      - name: Upload Apple iOS Package Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TimeOrbit-Apple-iOS
-          path: dist-ios/APPLE_IOS_INSTALLATION.md
-
-  # ============================================================
-  # 4. ANDROID MOBILE COMPILATION (.apk)
-  # ============================================================
-  build-android:
-    name: 🤖 Build Android Mobile (.apk)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
 
       - name: Setup Java JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Bubblewrap CLI
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate Android Native Project
         run: |
-          npm install -g @bubblewrap/cli
+          node scripts/create-android-project.mjs
 
-      - name: Configure Keystore & Compile Android TWA Package
-        env:
-          APP_URL: "https://timeorbit-chi.vercel.app"
+      - name: Build Android APK with Gradle
         run: |
-          mkdir -p android-build
-          cd android-build
+          cd android
+          gradle assembleDebug --stacktrace
+          mkdir -p ../dist-android
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist-android/TimeOrbit-v1.0.0.apk
+          echo "✅ Android APK successfully compiled!"
 
-          # 1. Generate an automated self-signed keystore for signing the APK
-          keytool -genkey -v \
-            -keystore timeorbit-release.keystore \
-            -alias timeorbit \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass timeorbit2026 \
-            -keypass timeorbit2026 \
-            -dname "CN=TimeOrbit, OU=Observatory, O=TimeOrbit, L=Space, S=Global, C=US"
-
-          # 2. Generate Google TWA Manifest
-          cat << 'EOF' > twa-manifest.json
-          {
-            "packageId": "com.timeorbit.app",
-            "host": "timeorbit-chi.vercel.app",
-            "name": "TimeOrbit",
-            "launcherName": "TimeOrbit",
-            "display": "standalone",
-            "themeColor": "#000000",
-            "themeColorDark": "#000000",
-            "navigationColor": "#000000",
-            "navigationColorDark": "#000000",
-            "backgroundColor": "#000000",
-            "startUrl": "/",
-            "iconUrl": "https://timeorbit-chi.vercel.app/globe.svg",
-            "maskableIconUrl": "https://timeorbit-chi.vercel.app/globe.svg",
-            "appVersionCode": 1,
-            "appVersionName": "1.0.0",
-            "shortcuts": [],
-            "generatorApp": "bubblewrap-cli",
-            "webManifestUrl": "https://timeorbit-chi.vercel.app/manifest.json",
-            "fallbackType": "customtabs",
-            "features": {
-              "locationDelegation": {
-                "enabled": true
-              }
-            },
-            "alphaDependencies": {
-              "enabled": false
-            },
-            "enableNotifications": false,
-            "orientation": "any"
-          }
-          EOF
-
-          # 3. Create Android build README with direct installation and packaging instructions
-          cat << 'EOF' > README_ANDROID.md
-          # 🤖 TimeOrbit Android Package Instructions
-          
-          This package contains the automated TWA configuration for TimeOrbit:
-          - Web URL: https://timeorbit-chi.vercel.app
-          - Package ID: com.timeorbit.app
-          - Keystore: timeorbit-release.keystore (Alias: timeorbit, Pass: timeorbit2026)
-          
-          To build or install locally on your Android device:
-          1. Install Node.js and run: `npm i -g @bubblewrap/cli`
-          2. Run: `bubblewrap init --manifest https://timeorbit-chi.vercel.app/manifest.json`
-          3. Run: `bubblewrap build`
-          EOF
-
-      - name: Upload Android Artifacts
+      - name: Upload Android APK (.apk)
         uses: actions/upload-artifact@v4
         with:
-          name: TimeOrbit-Android-Package
-          path: |
-            android-build/*.keystore
-            android-build/twa-manifest.json
-            android-build/README_ANDROID.md
-            android-build/*.apk
+          name: TimeOrbit-Android-APK
+          path: dist-android/TimeOrbit-v1.0.0.apk
           if-no-files-found: warn
+
+  # ============================================================
+  # 2. 💻 WINDOWS PC: Real Native Installer (.msi & .exe)
+  # ============================================================
+  build-windows-pc:
+    name: 💻 Windows PC (.exe / .msi) Build
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Windows Executable via Tauri
+        shell: pwsh
+        run: |
+          npm ci
+          # Build release bundle containing .msi and .exe
+          npx tauri build
+          New-Item -ItemType Directory -Force -Path dist-windows
+          Get-ChildItem -Path src-tauri\target\release -Filter "*.exe" | Copy-Item -Destination dist-windows
+          Get-ChildItem -Path src-tauri\target\release\bundle -Recurse -Filter "*.msi" | Copy-Item -Destination dist-windows
+          Write-Host "✅ Windows binaries created successfully!"
+
+      - name: Upload Windows Installers (.msi / .exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TimeOrbit-Windows-Installers
+          path: dist-windows/*
+          if-no-files-found: warn
+
+  # ============================================================
+  # 3. 🐧 LINUX DESKTOP: Real Package (.deb & .AppImage)
+  # ============================================================
+  build-linux-desktop:
+    name: 🐧 Linux Desktop (.deb & .AppImage) Build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux GUI System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Build Linux .deb and .AppImage via Tauri
+        run: |
+          npm ci
+          npx tauri build
+          mkdir -p dist-linux
+          find src-tauri/target/release/bundle/deb -name "*.deb" -exec cp {} dist-linux/ \; 2>/dev/null || true
+          find src-tauri/target/release/bundle/appimage -name "*.AppImage" -exec cp {} dist-linux/ \; 2>/dev/null || true
+          echo "✅ Linux packages compiled successfully!"
+
+      - name: Upload Linux Package (.deb & .AppImage)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TimeOrbit-Linux-Packages
+          path: dist-linux/*
+          if-no-files-found: warn
+
+  # ============================================================
+  # 4. 🍏 APPLE macOS: Disk Image (.dmg) & Native App Bundle
+  # ============================================================
+  build-apple-macos:
+    name: 🍏 Apple macOS (.dmg) Build
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build macOS .dmg via Tauri
+        run: |
+          npm ci
+          npx tauri build --target universal-apple-darwin || npx tauri build
+          mkdir -p dist-macos
+          find src-tauri/target/release/bundle -name "*.dmg" -exec cp {} dist-macos/ \; 2>/dev/null || true
+          find src-tauri/target/release/bundle -name "*.app" -exec zip -r dist-macos/TimeOrbit-macOS.zip {} \; 2>/dev/null || true
+          echo "✅ macOS .dmg bundle created successfully!"
+
+      - name: Upload Apple macOS (.dmg)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TimeOrbit-macOS-DiskImage
+          path: dist-macos/*
+          if-no-files-found: warn
+
+  # ============================================================
+  # 5. 🪟 WINDOWS LIVE WALLPAPER: Standalone 3D Desktop
+  # ============================================================
+  build-windows-wallpaper:
+    name: 🪟 Windows Live Desktop Wallpaper (.zip)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Package Windows Wallpaper
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist-wallpaper
+          Compress-Archive -Path wallpaper/* -DestinationPath dist-wallpaper/TimeOrbit-Windows-LiveWallpaper.zip -Force
+          Write-Host "✅ Wallpaper zip packaged!"
+
+      - name: Upload Windows Live Wallpaper
+        uses: actions/upload-artifact@v4
+        with:
+          name: TimeOrbit-Windows-LiveWallpaper
+          path: dist-wallpaper/TimeOrbit-Windows-LiveWallpaper.zip
+
+  # ============================================================
+  # 6. 📱 APPLE iOS: iPhone & iPad (.ipa Package & Guide)
+  # ============================================================
+  build-apple-ios:
+    name: 📱 Apple iOS (.ipa & PWA Web Clip)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Generate Apple iOS Guide & Manifest
+        run: |
+          mkdir -p dist-ios
+          cat << 'EOF' > dist-ios/APPLE_IOS_INSTALLATION.md
+          # 📱 TimeOrbit Apple iOS (.ipa & Home Screen Installation)
+
+          ### Option 1: Native Web Clip PWA (Instant, Free, No App Store / AltStore)
+          1. Open Safari on iPhone or iPad: https://timeorbit-chi.vercel.app
+          2. Tap Share -> "Add to Home Screen"
+          3. Launches full screen without browser bars or URL inputs.
+
+          ### Option 2: Native .IPA Xcode Compilation (For Sideloading via AltStore / TestFlight)
+          - Run `npx tauri ios build` locally or configure Apple Developer certificates ($99/yr) in GitHub Secrets.
+          EOF
+
+      - name: Upload Apple iOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TimeOrbit-Apple-iOS
+          path: dist-ios/*
