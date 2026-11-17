@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Globe2, Key, BookOpen, ShieldCheck, LogOut, ArrowRight, Clock, Menu, X, Timer, CalendarDays, Download } from 'lucide-react';
+import { isNativeApp } from '@/lib/platform';
 
 interface UserSession {
   id: string;
@@ -18,6 +19,7 @@ export default function Navbar() {
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isNative, setIsNative] = useState(false);
 
   const fetchSession = useCallback(async () => {
     try {
@@ -38,6 +40,7 @@ export default function Navbar() {
   useEffect(() => {
     queueMicrotask(() => {
       fetchSession();
+      setIsNative(isNativeApp());
     });
   }, [fetchSession, pathname]);
 
@@ -57,7 +60,7 @@ export default function Navbar() {
     { name: 'Compare', href: '/compare', icon: Clock },
     { name: 'Clock', href: '/clock', icon: Timer },
     { name: 'Calendar', href: '/calendar', icon: CalendarDays },
-    { name: 'Download', href: '/download', icon: Download },
+    ...(!isNative ? [{ name: 'Download', href: '/download', icon: Download }] : []),
     { name: 'API Docs', href: '/docs', icon: BookOpen },
     { name: 'Dashboard', href: '/dashboard', icon: Key },
   ];

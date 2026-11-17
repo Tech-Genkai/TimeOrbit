@@ -211,9 +211,18 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(true);
         settings.setLoadsImagesAutomatically(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setUserAgentString(settings.getUserAgentString() + " TimeOrbitApp/1.0.0");
 
         // Hardware Acceleration for WebGL 3D Earth rendering
         webView.setLayerType(WebView.LAYER_TYPE_HARDWARE, null);
+
+        // Inject Native App Bridge identifier
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public boolean isNative() {
+                return true;
+            }
+        }, "TimeOrbitNative");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { isNativeApp } from '@/lib/platform';
 import {
   Download,
   Smartphone,
@@ -162,9 +163,11 @@ export default function DownloadPage() {
   const [detectedPlatform, setDetectedPlatform] = useState<PlatformKey>('windows');
   const [activeFaq, setActiveFaq] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [isNative, setIsNative] = useState(false);
 
   useEffect(() => {
     queueMicrotask(() => {
+      setIsNative(isNativeApp());
       if (typeof window === 'undefined') return;
       const ua = navigator.userAgent.toLowerCase();
       if (/android/.test(ua)) {
@@ -202,6 +205,19 @@ export default function DownloadPage() {
             Available natively for desktop, mobile, and live wallpaper.
           </p>
         </div>
+
+        {/* Native App Active Alert (If viewing inside the native app) */}
+        {isNative && (
+          <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 sm:p-5 flex items-center gap-3 text-emerald-300 text-xs font-mono shadow-lg">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <div>
+              <span className="font-semibold uppercase tracking-wider block text-white text-sm">You are using the Native TimeOrbit App</span>
+              <span className="text-zinc-300 font-light">
+                Version 1.0.0 is currently active on your device. You already have the native application installed!
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Recommended Download Hero Box (Auto-Detected Platform) */}
         <div className="relative rounded-3xl bg-radial from-[#fea082]/10 via-black/80 to-black/95 border border-[#fea082]/40 p-6 sm:p-10 backdrop-blur-2xl shadow-[0_0_40px_rgba(254,160,130,0.12)] overflow-hidden">

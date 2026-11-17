@@ -29,6 +29,7 @@ import {
   Minimize2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { isNativeApp } from '@/lib/platform';
 import GlobeCanvas, { GlobeCanvasHandle } from '@/components/globe/GlobeCanvas';
 import ISSPassModal from '@/components/iss/ISSPassModal';
 import { CITIES, findNearestCity, resolveUserCity } from '@/lib/cities';
@@ -119,6 +120,13 @@ export default function HomePage() {
   // Fullscreen Observatory Clock state
   const [isFullscreenClockOpen, setIsFullscreenClockOpen] = useState<boolean>(false);
   const [is12HourClock, setIs12HourClock] = useState<boolean>(false);
+  const [isNative, setIsNative] = useState<boolean>(false);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setIsNative(isNativeApp());
+    });
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -476,15 +484,17 @@ export default function HomePage() {
               <span className="hidden sm:inline">Clock Mode</span>
             </button>
 
-            {/* Download App Link Button */}
-            <Link
-              href="/download"
-              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-zinc-300 hover:text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#38bdf8] backdrop-blur-md transition-all cursor-pointer shadow-lg shrink-0"
-              title="Download TimeOrbit Native Apps (Android, Windows, macOS, Linux)"
-            >
-              <Download className="w-3.5 h-3.5 text-[#38bdf8]" />
-              <span className="hidden sm:inline">Get App</span>
-            </Link>
+            {/* Download App Link Button (Only shown on public web; hidden inside native app) */}
+            {!isNative && (
+              <Link
+                href="/download"
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-zinc-300 hover:text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#38bdf8] backdrop-blur-md transition-all cursor-pointer shadow-lg shrink-0"
+                title="Download TimeOrbit Native Apps (Android, Windows, macOS, Linux)"
+              >
+                <Download className="w-3.5 h-3.5 text-[#38bdf8]" />
+                <span className="hidden sm:inline">Get App</span>
+              </Link>
+            )}
 
             {/* Time Travel Simulation Toggle */}
             <button
