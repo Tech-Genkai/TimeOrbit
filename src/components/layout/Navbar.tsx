@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Globe2, Key, BookOpen, ShieldCheck, LogOut, ArrowRight, Clock, Menu, X, Timer, CalendarDays } from 'lucide-react';
+import { Globe2, Key, BookOpen, ShieldCheck, LogOut, ArrowRight, Clock, Menu, X, Timer, CalendarDays, Download } from 'lucide-react';
 
 interface UserSession {
   id: string;
@@ -57,6 +57,7 @@ export default function Navbar() {
     { name: 'Compare', href: '/compare', icon: Clock },
     { name: 'Clock', href: '/clock', icon: Timer },
     { name: 'Calendar', href: '/calendar', icon: CalendarDays },
+    { name: 'Download', href: '/download', icon: Download },
     { name: 'API Docs', href: '/docs', icon: BookOpen },
     { name: 'Dashboard', href: '/dashboard', icon: Key },
   ];

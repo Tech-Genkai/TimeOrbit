@@ -476,6 +476,16 @@ export default function HomePage() {
               <span className="hidden sm:inline">Clock Mode</span>
             </button>
 
+            {/* Download App Link Button */}
+            <Link
+              href="/download"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase text-zinc-300 hover:text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#38bdf8] backdrop-blur-md transition-all cursor-pointer shadow-lg shrink-0"
+              title="Download TimeOrbit Native Apps (Android, Windows, macOS, Linux)"
+            >
+              <Download className="w-3.5 h-3.5 text-[#38bdf8]" />
+              <span className="hidden sm:inline">Get App</span>
+            </Link>
+
             {/* Time Travel Simulation Toggle */}
             <button
               type="button"
