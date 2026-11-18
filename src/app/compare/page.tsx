@@ -244,26 +244,28 @@ export default function ComparePage() {
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleDetectLocation}
-              disabled={isLocating}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer whitespace-nowrap active:scale-95"
-            >
-              <Navigation className={`w-3 h-3 text-[#fea082] ${isLocating ? 'animate-spin' : ''}`} />
-              <span>{isLocating ? 'Locating...' : 'Detect GPS'}</span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={isLocating}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              >
+                <Navigation className={`w-3 h-3 text-[#fea082] ${isLocating ? 'animate-spin' : ''}`} />
+                <span>{isLocating ? 'Locating...' : 'Detect GPS'}</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={handleSwapPrimary}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer whitespace-nowrap active:scale-95"
-              title="Swap primary hubs"
-            >
-              <ArrowRightLeft className="w-3 h-3 text-[#fea082]" />
-              <span>Swap 1 ⇄ 2</span>
-            </button>
+              <button
+                type="button"
+                onClick={handleSwapPrimary}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs uppercase tracking-wider text-zinc-300 bg-white/5 hover:bg-white/10 border border-white/15 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                title="Swap primary hubs"
+              >
+                <ArrowRightLeft className="w-3 h-3 text-[#fea082]" />
+                <span>Swap 1 ⇄ 2</span>
+              </button>
+            </div>
 
             {cities.length < 5 && (
               <select

@@ -27,9 +27,12 @@ import {
   Pause,
   Maximize2,
   Minimize2,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import Link from 'next/link';
 import { isNativeApp } from '@/lib/platform';
+import { audioEngine } from '@/lib/audioEngine';
 import GlobeCanvas, { GlobeCanvasHandle } from '@/components/globe/GlobeCanvas';
 import ISSPassModal from '@/components/iss/ISSPassModal';
 import { CITIES, findNearestCity, resolveUserCity } from '@/lib/cities';
@@ -121,10 +124,17 @@ export default function HomePage() {
   const [isFullscreenClockOpen, setIsFullscreenClockOpen] = useState<boolean>(false);
   const [is12HourClock, setIs12HourClock] = useState<boolean>(false);
   const [isNative, setIsNative] = useState<boolean>(false);
+  const [isSoundActive, setIsSoundActive] = useState<boolean>(false);
+
+  const handleToggleSound = () => {
+    const next = audioEngine.toggleCosmicAmbient();
+    setIsSoundActive(next);
+  };
 
   useEffect(() => {
     queueMicrotask(() => {
       setIsNative(isNativeApp());
+      setIsSoundActive(audioEngine.getAmbientState());
     });
   }, []);
 
@@ -217,6 +227,11 @@ export default function HomePage() {
       setEarthTelemetry(getEarthOrbitalTelemetry(now));
       setLunarEphemeris(getLunarDetailedEphemeris(now));
       setIssTelemetry(getISSOrbitalPosition(now));
+
+      // Trigger automatic hourly observatory chime at the top of the hour
+      if (!simulatedDate && now.getMinutes() === 0 && now.getSeconds() === 0 && audioEngine.getHourlyChimeState()) {
+        audioEngine.playObservatoryChime(528);
+      }
     };
 
     queueMicrotask(update);
@@ -482,6 +497,25 @@ export default function HomePage() {
             >
               <Maximize2 className="w-3.5 h-3.5 text-[#fea082]" />
               <span className="hidden sm:inline">Clock Mode</span>
+            </button>
+
+            {/* Cosmic Ambient Soundscape Toggle (Web Audio API) */}
+            <button
+              type="button"
+              onClick={handleToggleSound}
+              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-[11px] font-light tracking-[0.16em] uppercase transition-all cursor-pointer backdrop-blur-md shadow-lg shrink-0 ${
+                isSoundActive
+                  ? 'bg-[#38bdf8]/20 border border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]'
+                  : 'text-zinc-300 hover:text-white bg-black/60 hover:bg-black/80 border border-white/20 hover:border-[#38bdf8]'
+              }`}
+              title={isSoundActive ? 'Mute Cosmic Ambient Soundscape' : 'Play Cosmic Ambient Drone (432Hz Focus Audio)'}
+            >
+              {isSoundActive ? (
+                <Volume2 className="w-3.5 h-3.5 text-[#38bdf8] animate-pulse" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 text-zinc-400" />
+              )}
+              <span className="hidden sm:inline">{isSoundActive ? 'Audio ON' : 'Audio'}</span>
             </button>
 
             {/* Download App Link Button (Only shown on public web; hidden inside native app) */}

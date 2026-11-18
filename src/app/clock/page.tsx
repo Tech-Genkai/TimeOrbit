@@ -17,7 +17,10 @@ import {
   Sparkles,
   ChevronDown,
   Globe,
+  Bell,
+  BellOff,
 } from 'lucide-react';
+import { audioEngine } from '@/lib/audioEngine';
 import { CITIES, resolveUserCity } from '@/lib/cities';
 import { getCityTime, getSolarElevationAndShadow, calculateSolarState } from '@/lib/timeEngine';
 import { CityData, IStopwatchLap } from '@/types';
@@ -33,6 +36,24 @@ export default function DigitalClockPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [copiedIso, setCopiedIso] = useState(false);
+  const [hourlyChimeEnabled, setHourlyChimeEnabled] = useState(false);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setHourlyChimeEnabled(audioEngine.getHourlyChimeState());
+    });
+  }, []);
+
+  const handleToggleHourlyChime = () => {
+    const next = !hourlyChimeEnabled;
+    setHourlyChimeEnabled(next);
+    audioEngine.setHourlyChimeState(next);
+    if (next) {
+      toast.celestial('Hourly Observatory Chime enabled (chimes on every hour).', 'Chime Active');
+    } else {
+      toast.info('Hourly Observatory Chime muted.', 'Chime Muted');
+    }
+  };
 
   // Live wall clock states
   const [now, setNow] = useState<Date>(() => new Date());
@@ -157,35 +178,10 @@ export default function DigitalClockPage() {
     toast.celestial(`Split: ${(lapTime / 1000).toFixed(2)}s recorded`, `Lap #${newLap.id}`);
   };
 
-  // --- 3. Synthesized Web Audio API Alarm (Zero external dependencies) ---
+  // --- 3. Synthesized Web Audio API Alarm (Rich 5.5s repeating celestial alarm) ---
   const playAlarmSound = useCallback(() => {
     if (!soundEnabled || typeof window === 'undefined') return;
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-
-      const playTone = (freq: number, start: number, duration: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + duration);
-      };
-
-      // 4-pip futuristic chime pattern
-      playTone(880, 0, 0.15); // A5
-      playTone(1108.73, 0.18, 0.15); // C#6
-      playTone(1318.51, 0.36, 0.15); // E6
-      playTone(1760, 0.54, 0.35); // A6
-    } catch (err) {
-      console.warn('Audio playback not supported:', err);
-    }
+    audioEngine.playTimerAlarm(4); // 4 repeating cycles (~5.5 seconds)
   }, [soundEnabled]);
 
   // --- 4. CountDown Timer Logic ---
@@ -432,7 +428,9 @@ interface VendorFullscreenElement extends HTMLElement {
         </button>
       )}
 
-      {/* When in Fullscreen Digital Clock Mode: ONLY show the Digital Clock centered cleanly! */}
+      {/* ========================================================= */}
+      {/* FULLSCREEN OBSERVATORY VIEWS                              */}
+      {/* ========================================================= */}
       {isFullscreen && activeTab === 'clock' ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-5xl mx-auto space-y-4 sm:space-y-6">
           {/* Location & Solar Status */}
@@ -479,6 +477,201 @@ interface VendorFullscreenElement extends HTMLElement {
           {/* Clean Calendar Date Line */}
           <div className="text-sm sm:text-xl font-light font-mono text-zinc-400 tracking-[0.2em] uppercase">
             {cityTime.currentDate}
+          </div>
+        </div>
+      ) : isFullscreen && activeTab === 'stopwatch' ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-5xl mx-auto space-y-6 sm:space-y-8 px-4">
+          {/* Status & Lap Telemetry Pill */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs sm:text-sm font-mono tracking-[0.25em] uppercase text-zinc-400 font-light">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                stopwatchRunning
+                  ? 'bg-emerald-400 shadow-[0_0_12px_#34d399] animate-pulse'
+                  : stopwatchElapsedMs > 0
+                  ? 'bg-amber-400 shadow-[0_0_10px_#fbbf24]'
+                  : 'bg-zinc-600'
+              }`}
+            />
+            <span className={stopwatchRunning ? 'text-emerald-300' : stopwatchElapsedMs > 0 ? 'text-amber-300' : 'text-zinc-400'}>
+              {stopwatchRunning
+                ? 'High-Frequency Chronograph Active'
+                : stopwatchElapsedMs > 0
+                ? 'Chronograph Paused'
+                : 'Precision Chronograph Ready'}
+            </span>
+            {laps.length > 0 && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono tracking-widest uppercase bg-white/10 border border-white/15 text-[#38bdf8]">
+                {laps.length} {laps.length === 1 ? 'Lap' : 'Laps'}
+              </span>
+            )}
+          </div>
+
+          {/* Giant Minimalist Stopwatch Digits */}
+          <div className="text-5xl xs:text-7xl sm:text-8xl md:text-9xl lg:text-[11rem] font-extralight font-mono tracking-tight text-white select-none drop-shadow-[0_0_45px_rgba(254,160,130,0.3)]">
+            {formatStopwatch(stopwatchElapsedMs)}
+          </div>
+
+          {/* Centered Ergonomic Action Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-4">
+            <button
+              type="button"
+              onClick={handleStartPauseStopwatch}
+              title="Start / Pause (Spacebar)"
+              className={`flex items-center justify-center gap-2 px-6 sm:px-10 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base font-mono tracking-widest uppercase transition-all shadow-2xl cursor-pointer active:scale-95 border ${
+                stopwatchRunning
+                  ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 hover:bg-amber-500/35 shadow-[0_0_30px_rgba(245,158,11,0.25)]'
+                  : 'bg-emerald-500/25 text-emerald-200 border-emerald-500/50 hover:bg-emerald-500/35 shadow-[0_0_30px_rgba(16,185,129,0.25)]'
+              }`}
+            >
+              {stopwatchRunning ? <Pause className="w-5 h-5 shrink-0" /> : <Play className="w-5 h-5 shrink-0" />}
+              <span>{stopwatchRunning ? 'Pause' : stopwatchElapsedMs > 0 ? 'Resume' : 'Start'}</span>
+              <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/50 border border-white/20 text-zinc-300 ml-1">
+                Space
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRecordLap}
+              disabled={!stopwatchRunning}
+              className={`flex items-center justify-center gap-2 px-4 sm:px-8 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base font-mono tracking-wider uppercase transition-all border cursor-pointer active:scale-95 ${
+                stopwatchRunning
+                  ? 'bg-white/10 text-white border-white/25 hover:bg-white/20 shadow-lg'
+                  : 'opacity-30 cursor-not-allowed bg-transparent text-zinc-600 border-white/10'
+              }`}
+            >
+              <Flag className="w-4 h-4 sm:w-5 sm:h-5 text-[#38bdf8] shrink-0" />
+              <span>Lap Split</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResetStopwatch}
+              disabled={stopwatchElapsedMs === 0}
+              className={`flex items-center justify-center gap-2 px-4 sm:px-8 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base font-mono tracking-wider uppercase transition-all border cursor-pointer active:scale-95 ${
+                stopwatchElapsedMs > 0
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30 shadow-lg'
+                  : 'opacity-30 cursor-not-allowed bg-transparent text-zinc-600 border-white/10'
+              }`}
+            >
+              <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* Floating Recent Lap Telemetry HUD */}
+          {laps.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-xs font-mono text-zinc-300">
+              <span className="text-zinc-500">
+                Latest Lap #{laps[0].id}: <strong className="text-white">+{formatStopwatch(laps[0].lapTime)}</strong>
+              </span>
+              {fastestLapId && (
+                <span className="text-emerald-400">
+                  Fastest: #{fastestLapId} (+{formatStopwatch(laps.find((l) => l.id === fastestLapId)?.lapTime || 0)})
+                </span>
+              )}
+              {slowestLapId && laps.length > 1 && (
+                <span className="text-rose-400">
+                  Slowest: #{slowestLapId} (+{formatStopwatch(laps.find((l) => l.id === slowestLapId)?.lapTime || 0)})
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Desktop Hotkey Legend */}
+          <div className="hidden sm:flex items-center justify-center gap-2 text-xs font-mono text-zinc-500">
+            <span>Press</span>
+            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-zinc-300 text-[10px]">Space</kbd>
+            <span>to start / pause</span>
+            <span className="mx-2">•</span>
+            <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/15 text-zinc-300 text-[10px]">Esc</kbd>
+            <span>to exit fullscreen</span>
+          </div>
+        </div>
+      ) : isFullscreen && activeTab === 'timer' ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center w-full max-w-5xl mx-auto space-y-6 sm:space-y-8 px-4">
+          {/* Status Badge */}
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-mono tracking-[0.25em] uppercase text-zinc-400 font-light">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                timerRunning
+                  ? 'bg-emerald-400 shadow-[0_0_12px_#34d399] animate-pulse'
+                  : timerCompleted
+                  ? 'bg-rose-400 shadow-[0_0_12px_#fb7185] animate-ping'
+                  : 'bg-zinc-600'
+              }`}
+            />
+            <span className={timerCompleted ? 'text-rose-400 font-bold' : timerRunning ? 'text-emerald-300' : 'text-zinc-400'}>
+              {timerCompleted
+                ? 'Countdown Session Complete!'
+                : timerRunning
+                ? 'Precision Countdown Running'
+                : 'Countdown Timer Ready'}
+            </span>
+          </div>
+
+          {/* Giant Countdown Digits */}
+          <div
+            className={`text-5xl xs:text-7xl sm:text-8xl md:text-9xl lg:text-[11rem] font-extralight font-mono tracking-tight select-none transition-all ${
+              timerCompleted
+                ? 'text-rose-400 animate-pulse drop-shadow-[0_0_50px_rgba(244,63,94,0.5)]'
+                : 'text-white drop-shadow-[0_0_45px_rgba(56,189,248,0.3)]'
+            }`}
+          >
+            {formatTimer(timerRemainingSec)}
+          </div>
+
+          {/* Progress Bar in Fullscreen */}
+          <div className="w-full max-w-md h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 ${
+                timerCompleted ? 'bg-rose-500' : 'bg-gradient-to-r from-[#38bdf8] to-[#fea082]'
+              }`}
+              style={{
+                width: `${timerDurationSec > 0 ? ((timerDurationSec - timerRemainingSec) / timerDurationSec) * 100 : 0}%`,
+              }}
+            />
+          </div>
+
+          {/* Centered Controls */}
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-4">
+            <button
+              type="button"
+              onClick={handleStartPauseTimer}
+              className={`flex items-center justify-center gap-2 px-6 sm:px-10 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base font-mono tracking-widest uppercase transition-all shadow-2xl cursor-pointer active:scale-95 border ${
+                timerRunning
+                  ? 'bg-amber-500/25 text-amber-200 border-amber-500/50 hover:bg-amber-500/35 shadow-[0_0_30px_rgba(245,158,11,0.25)]'
+                  : 'bg-emerald-500/25 text-emerald-200 border-emerald-500/50 hover:bg-emerald-500/35 shadow-[0_0_30px_rgba(16,185,129,0.25)]'
+              }`}
+            >
+              {timerRunning ? <Pause className="w-5 h-5 shrink-0" /> : <Play className="w-5 h-5 shrink-0" />}
+              <span>{timerCompleted ? 'Restart' : timerRunning ? 'Pause' : 'Start'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleResetTimer(timerDurationSec)}
+              className="flex items-center justify-center gap-2 px-4 sm:px-8 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base font-mono tracking-wider uppercase transition-all border border-white/20 bg-white/10 hover:bg-white/20 text-white cursor-pointer active:scale-95"
+            >
+              <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+              <span>Reset</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleResetTimer(timerRemainingSec + 60)}
+              className="px-4 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-xs sm:text-sm font-mono tracking-wider uppercase border border-white/15 bg-white/5 hover:bg-white/10 text-zinc-300 cursor-pointer active:scale-95"
+            >
+              +1 Min
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleResetTimer(timerRemainingSec + 300)}
+              className="px-4 sm:px-6 py-3.5 sm:py-4 rounded-2xl text-xs sm:text-sm font-mono tracking-wider uppercase border border-white/15 bg-white/5 hover:bg-white/10 text-zinc-300 cursor-pointer active:scale-95"
+            >
+              +5 Min
+            </button>
           </div>
         </div>
       ) : (
@@ -562,12 +755,12 @@ interface VendorFullscreenElement extends HTMLElement {
             <div className="space-y-6">
               {/* Control Bar: City Selector & 12h/24h Toggle */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md">
-                <div className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-2.5 min-w-0 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2.5 min-w-0 w-full sm:w-auto">
                   <div className="flex items-center gap-2 shrink-0">
                     <Globe className="w-4 h-4 text-[#38bdf8] shrink-0" />
                     <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Observatory Timezone:</span>
                   </div>
-                  <div className="relative w-full xs:w-auto min-w-0 flex-1">
+                  <div className="relative w-full sm:w-72 md:w-80 min-w-0">
                     <select
                       value={selectedCity.id}
                       onChange={(e) => {
@@ -586,13 +779,27 @@ interface VendorFullscreenElement extends HTMLElement {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => setIs12Hour(!is12Hour)}
                     className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-mono tracking-wider uppercase bg-white/5 hover:bg-white/15 border border-white/15 text-zinc-300 hover:text-white transition-all cursor-pointer text-center whitespace-nowrap active:scale-95"
                   >
                     Format: <span className="text-[#fea082] font-semibold">{is12Hour ? '12-Hour' : '24-Hour'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleHourlyChime}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono tracking-wider uppercase border transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
+                      hourlyChimeEnabled
+                        ? 'bg-[#38bdf8]/20 border-[#38bdf8]/50 text-white shadow-[0_0_10px_rgba(56,189,248,0.2)]'
+                        : 'bg-white/5 border-white/15 text-zinc-400 hover:text-white'
+                    }`}
+                    title="Toggle Observatory Chime at the top of every hour"
+                  >
+                    {hourlyChimeEnabled ? <Bell className="w-3.5 h-3.5 text-[#38bdf8]" /> : <BellOff className="w-3.5 h-3.5" />}
+                    <span>{hourlyChimeEnabled ? 'Chime: ON' : 'Chime: OFF'}</span>
                   </button>
 
                   <button
@@ -708,18 +915,18 @@ interface VendorFullscreenElement extends HTMLElement {
               </div>
 
               {/* Stopwatch Action Buttons */}
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-6 sm:mt-8">
+              <div className="grid grid-cols-3 gap-2 w-full max-w-sm sm:max-w-md mx-auto sm:flex sm:items-center sm:justify-center sm:gap-4 mt-6 sm:mt-8">
                 <button
                   type="button"
                   onClick={handleStartPauseStopwatch}
                   title="Start / Pause Stopwatch (Press Spacebar)"
-                  className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono tracking-wider sm:tracking-widest uppercase transition-all shadow-xl cursor-pointer active:scale-95 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono tracking-wider sm:tracking-widest uppercase transition-all shadow-xl cursor-pointer active:scale-95 w-full sm:w-auto ${
                     stopwatchRunning
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
                       : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
                   }`}
                 >
-                  {stopwatchRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {stopwatchRunning ? <Pause className="w-4 h-4 shrink-0" /> : <Play className="w-4 h-4 shrink-0" />}
                   <span>{stopwatchRunning ? 'Pause' : stopwatchElapsedMs > 0 ? 'Resume' : 'Start'}</span>
                   <span className="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 border border-white/15 text-zinc-300 ml-1">
                     Space
@@ -730,27 +937,29 @@ interface VendorFullscreenElement extends HTMLElement {
                   type="button"
                   onClick={handleRecordLap}
                   disabled={!stopwatchRunning}
-                  className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono tracking-wider sm:tracking-widest uppercase transition-all border cursor-pointer active:scale-95 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono tracking-wider sm:tracking-widest uppercase transition-all border cursor-pointer active:scale-95 w-full sm:w-auto ${
                     stopwatchRunning
                       ? 'bg-white/10 text-white border-white/25 hover:bg-white/20'
                       : 'opacity-40 cursor-not-allowed bg-transparent text-zinc-500 border-white/10'
                   }`}
                 >
-                  <Flag className="w-4 h-4 text-[#38bdf8]" />
-                  <span>Lap Split</span>
+                  <Flag className="w-4 h-4 text-[#38bdf8] shrink-0" />
+                  <span>
+                    <span className="hidden xs:inline">Lap </span>Split
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleResetStopwatch}
                   disabled={stopwatchElapsedMs === 0}
-                  className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono tracking-wider sm:tracking-widest uppercase transition-all border cursor-pointer active:scale-95 ${
+                  className={`flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-mono tracking-wider sm:tracking-widest uppercase transition-all border cursor-pointer active:scale-95 w-full sm:w-auto ${
                     stopwatchElapsedMs > 0
                       ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25'
                       : 'opacity-40 cursor-not-allowed bg-transparent text-zinc-500 border-white/10'
                   }`}
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-4 h-4 shrink-0" />
                   <span>Reset</span>
                 </button>
               </div>
@@ -816,8 +1025,16 @@ interface VendorFullscreenElement extends HTMLElement {
                 ? 'border-emerald-400 shadow-[0_0_50px_rgba(52,211,153,0.3)] animate-pulse'
                 : 'border-white/15'
             }`}>
-              {/* Audio Chime Notification Toggle */}
-              <div className="flex justify-end mb-2">
+              {/* Audio Chime Notification Toggle & Preview */}
+              <div className="flex flex-wrap items-center justify-end gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => playAlarmSound()}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-mono tracking-wider bg-white/5 hover:bg-white/15 border border-white/10 text-zinc-400 hover:text-white transition-all cursor-pointer"
+                  title="Test & Preview Alarm Sound (5.5s)"
+                >
+                  Preview Alarm
+                </button>
                 <button
                   type="button"
                   onClick={() => setSoundEnabled(!soundEnabled)}

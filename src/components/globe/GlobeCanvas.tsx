@@ -242,6 +242,147 @@ function createProceduralEarthTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+// Generates dedicated High-Fidelity Night-Side City Lights Texture (Emissive Map)
+function createProceduralNightLightsTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Pure black transparent background - only city lights emit light
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, w, h);
+
+  const toX = (lng: number) => ((lng + 180) / 360) * w;
+  const toY = (lat: number) => ((90 - lat) / 180) * h;
+
+  // Major global metropolitan clusters and regional urban density corridors
+  const METRO_CLUSTERS = [
+    // North America BosWash & West Coast
+    { lat: 40.71, lng: -74.0, radius: 14, intensity: 1.0 }, // New York
+    { lat: 34.05, lng: -118.24, radius: 12, intensity: 0.95 }, // Los Angeles
+    { lat: 41.87, lng: -87.62, radius: 10, intensity: 0.85 }, // Chicago
+    { lat: 29.76, lng: -95.36, radius: 9, intensity: 0.8 }, // Houston
+    { lat: 37.77, lng: -122.41, radius: 10, intensity: 0.9 }, // SF Bay
+    { lat: 47.6, lng: -122.33, radius: 8, intensity: 0.75 }, // Seattle
+    { lat: 43.65, lng: -79.38, radius: 10, intensity: 0.85 }, // Toronto
+    { lat: 19.43, lng: -99.13, radius: 13, intensity: 0.9 }, // Mexico City
+
+    // Europe Blue Banana
+    { lat: 51.5, lng: -0.12, radius: 14, intensity: 1.0 }, // London
+    { lat: 48.85, lng: 2.35, radius: 13, intensity: 0.95 }, // Paris
+    { lat: 52.52, lng: 13.4, radius: 10, intensity: 0.85 }, // Berlin
+    { lat: 50.85, lng: 4.35, radius: 11, intensity: 0.9 }, // Brussels/Benelux
+    { lat: 41.9, lng: 12.49, radius: 9, intensity: 0.8 }, // Rome
+    { lat: 40.41, lng: -3.7, radius: 10, intensity: 0.85 }, // Madrid
+    { lat: 55.75, lng: 37.61, radius: 12, intensity: 0.9 }, // Moscow
+    { lat: 41.0, lng: 28.97, radius: 12, intensity: 0.9 }, // Istanbul
+
+    // East Asia Tokaido & China Coast
+    { lat: 35.67, lng: 139.65, radius: 16, intensity: 1.0 }, // Tokyo
+    { lat: 34.69, lng: 135.5, radius: 11, intensity: 0.9 }, // Osaka
+    { lat: 31.23, lng: 121.47, radius: 15, intensity: 1.0 }, // Shanghai
+    { lat: 39.9, lng: 116.4, radius: 14, intensity: 0.95 }, // Beijing
+    { lat: 23.12, lng: 113.26, radius: 14, intensity: 0.95 }, // Guangzhou/Shenzhen
+    { lat: 22.31, lng: 114.16, radius: 12, intensity: 0.95 }, // Hong Kong
+    { lat: 37.56, lng: 126.97, radius: 13, intensity: 0.95 }, // Seoul
+    { lat: 25.03, lng: 121.56, radius: 10, intensity: 0.85 }, // Taipei
+
+    // South Asia & Southeast Asia
+    { lat: 28.61, lng: 77.2, radius: 15, intensity: 1.0 }, // Delhi
+    { lat: 19.07, lng: 72.87, radius: 14, intensity: 0.95 }, // Mumbai
+    { lat: 12.97, lng: 77.59, radius: 12, intensity: 0.9 }, // Bengaluru
+    { lat: 22.57, lng: 88.36, radius: 11, intensity: 0.85 }, // Kolkata
+    { lat: 1.35, lng: 103.81, radius: 11, intensity: 0.95 }, // Singapore
+    { lat: 13.75, lng: 100.5, radius: 12, intensity: 0.9 }, // Bangkok
+    { lat: -6.2, lng: 106.84, radius: 13, intensity: 0.9 }, // Jakarta
+
+    // Middle East
+    { lat: 25.2, lng: 55.27, radius: 12, intensity: 0.95 }, // Dubai
+    { lat: 24.71, lng: 46.67, radius: 11, intensity: 0.85 }, // Riyadh
+    { lat: 30.04, lng: 31.23, radius: 13, intensity: 0.9 }, // Cairo
+
+    // South America, Africa & Oceania
+    { lat: -23.55, lng: -46.63, radius: 14, intensity: 0.95 }, // Sao Paulo
+    { lat: -22.9, lng: -43.17, radius: 11, intensity: 0.85 }, // Rio
+    { lat: -34.6, lng: -58.38, radius: 11, intensity: 0.85 }, // Buenos Aires
+    { lat: -26.2, lng: 28.04, radius: 10, intensity: 0.8 }, // Johannesburg
+    { lat: 6.52, lng: 3.37, radius: 11, intensity: 0.8 }, // Lagos
+    { lat: -33.86, lng: 151.2, radius: 11, intensity: 0.9 }, // Sydney
+    { lat: -37.81, lng: 144.96, radius: 10, intensity: 0.85 }, // Melbourne
+  ];
+
+  // Draw regional urban highway/coastal corridors
+  const CORRIDORS = [
+    // US BosWash
+    [[42.36, -71.05], [40.71, -74.0], [39.95, -75.16], [38.9, -77.03]],
+    // US Midwest
+    [[41.87, -87.62], [42.33, -83.04], [41.49, -81.69]],
+    // Europe London-Paris-Rhine-Milan
+    [[51.5, -0.12], [50.85, 4.35], [51.22, 6.77], [50.11, 8.68], [47.37, 8.54], [45.46, 9.19]],
+    // Japan Tokaido
+    [[35.67, 139.65], [35.18, 136.9], [34.98, 135.75], [34.69, 135.5]],
+    // India Indo-Gangetic & Coastal
+    [[28.61, 77.2], [26.84, 80.94], [25.59, 85.13], [22.57, 88.36]],
+    [[19.07, 72.87], [18.52, 73.85], [12.97, 77.59], [13.08, 80.27]],
+  ];
+
+  ctx.lineWidth = 1.5;
+  for (const corr of CORRIDORS) {
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.28)';
+    ctx.beginPath();
+    for (let i = 0; i < corr.length; i++) {
+      const [clat, clng] = corr[i];
+      const px = toX(clng);
+      const py = toY(clat);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+
+  // Draw metropolitan glowing halos
+  for (const m of METRO_CLUSTERS) {
+    const x = toX(m.lng);
+    const y = toY(m.lat);
+    const rad = m.radius * 1.4;
+
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    grad.addColorStop(0, `rgba(255, 245, 200, ${0.98 * m.intensity})`);
+    grad.addColorStop(0.25, `rgba(254, 190, 70, ${0.75 * m.intensity})`);
+    grad.addColorStop(0.65, `rgba(234, 88, 12, ${0.35 * m.intensity})`);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw all city network points from CITIES
+  for (const c of CITIES) {
+    const cx = toX(c.lng);
+    const cy = toY(c.lat);
+    const pointGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 5);
+    pointGrad.addColorStop(0, 'rgba(255, 255, 230, 0.95)');
+    pointGrad.addColorStop(0.4, 'rgba(250, 204, 21, 0.7)');
+    pointGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pointGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
 // Procedural Cloud Canvas Texture
 function createProceduralCloudTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
@@ -491,10 +632,14 @@ const GlobeCanvas = forwardRef<GlobeCanvasHandle, GlobeCanvasProps>(function Glo
     const earthRadius = 1.45;
     const earthGeo = new THREE.SphereGeometry(earthRadius, 64, 64);
     const earthTex = createProceduralEarthTexture();
+    const nightLightsTex = createProceduralNightLightsTexture();
     const earthMat = new THREE.MeshStandardMaterial({
       map: earthTex,
       roughness: 0.65,
       metalness: 0.08,
+      emissive: new THREE.Color(0xfff0c2),
+      emissiveMap: nightLightsTex,
+      emissiveIntensity: 0.9,
     });
     const earthMesh = new THREE.Mesh(earthGeo, earthMat);
     scene.add(earthMesh);

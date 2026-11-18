@@ -19,6 +19,7 @@ import {
   CalendarDays,
   ArrowUpRight,
   Bell,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   calculateAnniversaryMilestone,
@@ -383,7 +384,12 @@ export default function CalendarPage() {
         </div>
 
         {/* Global Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[10px] font-mono tracking-wider">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>100% Private (Local to Device)</span>
+          </div>
+
           <button
             type="button"
             onClick={handleExportAllIcs}
@@ -856,12 +862,18 @@ export default function CalendarPage() {
               </div>
             )}
 
+            {/* Privacy Guarantee Banner */}
+            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-mono text-emerald-300">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Private to you: Events and festivals are stored on this device only and never shared with other users.</span>
+            </div>
+
             {/* Modal Form */}
             <form onSubmit={handleCreateEvent} className="space-y-4">
               {/* Event Type Switcher */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { id: 'holiday', label: '🎉 Holiday' },
+                  { id: 'holiday', label: '🎉 Festival / Holiday' },
                   { id: 'birthday', label: '🎂 Birthday' },
                   { id: 'anniversary', label: '💍 Anniversary' },
                   { id: 'reminder', label: '🔔 Reminder' },

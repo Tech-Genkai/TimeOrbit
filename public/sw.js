@@ -1,8 +1,12 @@
-// TimeOrbit Offline-First PWA Service Worker
-const CACHE_NAME = 'timeorbit-cache-v1';
+// TimeOrbit Offline-First PWA Service Worker (v2)
+const CACHE_NAME = 'timeorbit-cache-v2';
 
 const STATIC_PRECACHE = [
   '/',
+  '/compare',
+  '/clock',
+  '/calendar',
+  '/download',
   '/manifest.json',
   '/globe.svg',
   '/wallpaper',
