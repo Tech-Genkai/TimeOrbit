@@ -20,9 +20,11 @@ export async function GET(req: Request) {
 
   let rateLimitLimit = 60;
   let rateLimitRemaining = 60;
-  if (authResult.apiKeyDoc) {
-    rateLimitLimit = authResult.apiKeyDoc.rateLimit || 60;
-    const rateCheck = await checkRateLimit(authResult.apiKeyDoc._id, rateLimitLimit);
+  const keyIdentifier = authResult.apiKeyDoc ? authResult.apiKeyDoc._id : authResult.neonApiKey ? String(authResult.neonApiKey.id) : null;
+  rateLimitLimit = authResult.apiKeyDoc?.rateLimit || authResult.neonApiKey?.rate_limit || 60;
+
+  if (keyIdentifier) {
+    const rateCheck = await checkRateLimit(keyIdentifier, rateLimitLimit);
     if (!rateCheck.allowed) {
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Maximum requests per minute reached.' },

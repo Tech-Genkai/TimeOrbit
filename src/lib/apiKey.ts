@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { connectToDatabase } from './mongodb';
 import { ApiKey, IApiKeyDocument } from '@/models/ApiKey';
 import { ApiLog } from '@/models/ApiLog';
+import { isNeonConfigured, neonFindApiKeyByHash, neonUpdateKeyLastUsed, NeonApiKey } from './neon';
 
 export interface GeneratedKeyResult {
   rawKey: string;
@@ -34,6 +35,7 @@ export function hashApiKey(rawKey: string): string {
 export interface ValidateKeyResult {
   valid: boolean;
   apiKeyDoc?: IApiKeyDocument;
+  neonApiKey?: NeonApiKey;
   reason?: string;
   statusCode?: number;
 }
@@ -50,6 +52,48 @@ export async function validateApiKey(rawKey: string | null | undefined): Promise
   const cleanKey = rawKey.startsWith('Bearer ') ? rawKey.replace('Bearer ', '').trim() : rawKey.trim();
   const keyHash = hashApiKey(cleanKey);
 
+  // 1. Dual-Database Check: If Neon Serverless Postgres is configured, check it first over pooled connection
+  if (isNeonConfigured()) {
+    try {
+      const neonResult = await neonFindApiKeyByHash(keyHash);
+      if (neonResult) {
+        const { apiKey } = neonResult;
+        if (apiKey.status === 'pending') {
+          return {
+            valid: false,
+            reason: 'API key is pending admin approval. You will receive access once approved by TimeOrbit Admin.',
+            statusCode: 403,
+          };
+        }
+        if (apiKey.status === 'rejected') {
+          return {
+            valid: false,
+            reason: `API key was rejected by admin. ${apiKey.rejection_reason ? `Reason: ${apiKey.rejection_reason}` : ''}`,
+            statusCode: 403,
+          };
+        }
+        if (apiKey.status === 'revoked') {
+          return {
+            valid: false,
+            reason: 'This API key has been revoked and can no longer be used.',
+            statusCode: 403,
+          };
+        }
+
+        // Update last used timestamp asynchronously without blocking request
+        neonUpdateKeyLastUsed(apiKey.id).catch((err) => console.error('Failed to update Neon key lastUsedAt:', err));
+
+        return {
+          valid: true,
+          neonApiKey: apiKey,
+        };
+      }
+    } catch (err) {
+      console.warn('Neon key validation fallback to MongoDB:', err);
+    }
+  }
+
+  // 2. Primary / Fallback: Check MongoDB Atlas
   await connectToDatabase();
   const apiKeyDoc = await ApiKey.findOne({ keyHash }).populate('userId', 'name email role');
 

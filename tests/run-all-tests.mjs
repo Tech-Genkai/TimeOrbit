@@ -2,6 +2,7 @@ import { runTimeEngineTests } from './timeEngine.test.mjs';
 import { runApiKeyTests } from './apiKey.test.mjs';
 import { runTokenBucketTests } from './tokenBucket.test.mjs';
 import { runEndpointsTests } from './endpoints.test.mjs';
+import { runNeonTests } from './neon.test.mjs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -32,6 +33,11 @@ async function main() {
   const t3 = await runEndpointsTests();
   totalPassed += t3.passed;
   totalFailed += t3.failed;
+
+  // 5. Neon Serverless Postgres Integration Suite
+  const tNeon = await runNeonTests();
+  totalPassed += tNeon.passed;
+  totalFailed += tNeon.failed;
 
   // 4. Analytics Empirical Challenge Suite (29 tests)
   console.log('\nRunning Analytics Empirical Challenge Suite...');

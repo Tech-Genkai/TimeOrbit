@@ -76,3 +76,4 @@ android/local.properties
 *.apks
 *.xapk
 *.apkm
+.neon

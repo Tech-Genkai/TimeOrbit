@@ -1,8 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
+import mongoose from 'mongoose';
 import { connectToDatabase } from './mongodb';
 import { User, IUserDocument } from '@/models/User';
 import { UserRole } from '@/types';
+import { isNeonConfigured, neonFindUserById } from './neon';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_key_change_me_in_production';
 const COOKIE_NAME = 'timeorbit_token';
@@ -35,9 +37,31 @@ export async function getSessionUser(): Promise<IUserDocument | null> {
     const payload = verifyJwtToken(token);
     if (!payload?.userId) return null;
 
-    await connectToDatabase();
-    const user = await User.findById(payload.userId);
-    return user;
+    // 1. Dual-Database Resolution: If userId is an integer (Neon ID)
+    const numericId = parseInt(payload.userId, 10);
+    if (!isNaN(numericId) && String(numericId) === String(payload.userId) && isNeonConfigured()) {
+      const neonUser = await neonFindUserById(numericId);
+      if (neonUser) {
+        return {
+          _id: String(neonUser.id) as unknown as mongoose.Types.ObjectId,
+          name: neonUser.name,
+          email: neonUser.email,
+          role: neonUser.role,
+          isAgeVerified: neonUser.is_age_verified,
+          createdAt: new Date(neonUser.created_at),
+          updatedAt: new Date(neonUser.updated_at),
+        } as unknown as IUserDocument;
+      }
+    }
+
+    // 2. Fallback: Query MongoDB if userId is an ObjectId
+    if (mongoose.Types.ObjectId.isValid(payload.userId)) {
+      await connectToDatabase();
+      const user = await User.findById(payload.userId);
+      return user;
+    }
+
+    return null;
   } catch (error) {
     console.error('getSessionUser error:', error);
     return null;

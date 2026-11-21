@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { connectToDatabase } from '@/lib/mongodb';
 import { User } from '@/models/User';
 import { signJwtToken, AUTH_COOKIE_NAME } from '@/lib/auth';
+import { isNeonConfigured, neonFindUserByEmail } from '@/lib/neon';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,9 +66,52 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    await connectToDatabase();
-
     const normalizedEmail = email.trim().toLowerCase();
+
+    // 1. Dual-Database Check: If Neon Serverless Postgres is configured, authenticate via Neon pooler first
+    if (isNeonConfigured()) {
+      try {
+        const neonUser = await neonFindUserByEmail(normalizedEmail);
+        if (neonUser) {
+          const isMatch = await bcrypt.compare(password, neonUser.password_hash);
+          if (isMatch) {
+            loginAttempts.delete(ip);
+            const token = signJwtToken({
+              userId: String(neonUser.id),
+              email: neonUser.email,
+              role: neonUser.role,
+              name: neonUser.name,
+            });
+
+            const response = NextResponse.json({
+              success: true,
+              user: {
+                id: neonUser.id,
+                name: neonUser.name,
+                email: neonUser.email,
+                role: neonUser.role,
+                createdAt: neonUser.created_at,
+              },
+            });
+
+            response.cookies.set(AUTH_COOKIE_NAME, token, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+              maxAge: 7 * 24 * 60 * 60,
+            });
+
+            return response;
+          }
+        }
+      } catch (err) {
+        console.warn('Neon auth check fallback to MongoDB:', err);
+      }
+    }
+
+    // 2. Primary / Fallback: Authenticate via MongoDB Atlas
+    await connectToDatabase();
     const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
