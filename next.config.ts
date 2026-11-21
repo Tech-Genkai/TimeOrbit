@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  experimental: {
+    agentUpgrade: 'security',
+  },
 
   // Production Security Headers
   async headers() {
